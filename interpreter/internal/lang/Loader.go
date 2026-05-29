@@ -13,12 +13,11 @@ import (
 type Loader struct {
 	path        string
 	modules     map[string]starlark.StringDict
-	resources   []ResourceDefinition
 	opts        *syntax.FileOptions
 	predeclared starlark.StringDict
 }
 
-func NewLoader(basePath string) *Loader {
+func NewLoader(basePath string, registry *ResourceRegistry) *Loader {
 	l := &Loader{
 		path:        basePath,
 		modules:     map[string]starlark.StringDict{},
@@ -26,7 +25,7 @@ func NewLoader(basePath string) *Loader {
 		predeclared: starlark.StringDict{},
 	}
 
-	l.registerDefaultBuiltins()
+	registerDefaultBuiltins(l, registry)
 
 	return l
 }
@@ -66,6 +65,6 @@ func (l *Loader) GetModuleNames() ([]string, error) {
 	return names, nil
 }
 
-func (l *Loader) Resources() []ResourceDefinition {
-	return l.resources
+func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) {
+	l.predeclared[name] = starlark.NewBuiltin(name, callback)
 }

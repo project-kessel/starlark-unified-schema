@@ -23,7 +23,8 @@ func main() {
 
 	flag.Parse()
 
-	loader := lang.NewLoader(*srcDir)
+	registry := lang.NewResourceRegistry()
+	loader := lang.NewLoader(*srcDir, registry)
 	thread := &starlark.Thread{
 		Name:  "main",
 		Print: func(_ *starlark.Thread, msg string) { fmt.Println(msg) },
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	jsonSchemaVisitor := output.NewJSONSchemaVisitor()
-	if err := lang.VisitResources(loader.Resources(), jsonSchemaVisitor); err != nil {
+	if err := lang.VisitResources(registry.Resources(), jsonSchemaVisitor); err != nil {
 		fmt.Fprintf(os.Stderr, "Error visiting resources: %v\n", err)
 		os.Exit(1)
 	}
