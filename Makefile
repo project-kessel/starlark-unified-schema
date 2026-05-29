@@ -6,5 +6,8 @@ build-interpreter:
 build-interpreter-debug:
 	go build -C ./interpreter/ -o ../bin/interpreter -gcflags="all=-N -l" cmd/interpreter/main.go
 
+test:
+	go test -C ./interpreter/ -count=1 ./...
+
 build-schema: build-interpreter
 	./bin/interpreter
