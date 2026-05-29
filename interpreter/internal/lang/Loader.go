@@ -1,32 +1,31 @@
 package lang
 
 import (
+	"fmt"
 	"os"
 	"path"
-	"path/filepath"
+	"strings"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
 
 type Loader struct {
-	path         string
-	modules      map[string]starlark.StringDict
-	opts         *syntax.FileOptions
-	predeclared  starlark.StringDict
-	module_names []string
+	path        string
+	modules     map[string]starlark.StringDict
+	opts        *syntax.FileOptions
+	predeclared starlark.StringDict
 }
 
-func NewLoader(path string) *Loader {
+func NewLoader(basePath string, registry *ResourceRegistry) *Loader {
 	l := &Loader{
-		path:         path,
-		modules:      map[string]starlark.StringDict{},
-		opts:         &syntax.FileOptions{},
-		predeclared:  starlark.StringDict{},
-		module_names: nil,
+		path:        basePath,
+		modules:     map[string]starlark.StringDict{},
+		opts:        &syntax.FileOptions{},
+		predeclared: starlark.StringDict{},
 	}
 
-	registerDefaultBuiltins(l)
+	registerDefaultBuiltins(l, registry)
 
 	return l
 }
@@ -39,7 +38,7 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 	location := path.Join(l.path, name)
 	contents, err := os.ReadFile(location)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading module %s: %w", name, err)
 	}
 
 	globals, err := starlark.ExecFileOptions(l.opts, thread, name, contents, l.predeclared)
@@ -48,40 +47,24 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 	}
 
 	l.modules[name] = globals
-
 	return globals, nil
 }
 
-func (l *Loader) GetAllModuleNames() ([]string, error) {
-	if l.module_names != nil {
-		return l.module_names, nil
-	}
-
+func (l *Loader) GetModuleNames() ([]string, error) {
 	entries, err := os.ReadDir(l.path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading schema directory %s: %w", l.path, err)
 	}
 
 	names := make([]string, 0, len(entries))
-
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".star") {
+			names = append(names, entry.Name())
 		}
-
-		if filepath.Ext(entry.Name()) != ".star" {
-			continue
-		}
-
-		names = append(names, entry.Name())
 	}
-
-	l.module_names = names
-
 	return names, nil
 }
 
 func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) {
-	v := starlark.NewBuiltin(name, callback)
-	l.predeclared[name] = v
+	l.predeclared[name] = starlark.NewBuiltin(name, callback)
 }
