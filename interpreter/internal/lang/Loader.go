@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
@@ -14,16 +15,22 @@ type Loader struct {
 	modules      map[string]starlark.StringDict
 	opts         *syntax.FileOptions
 	predeclared  starlark.StringDict
+	reader       sourceFileReader
 	module_names []string
 }
 
 func NewLoader(path string) *Loader {
+	return newLoaderForReader(path, &filesystemSourceFileReader{})
+}
+
+func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 	l := &Loader{
 		path:         path,
 		modules:      map[string]starlark.StringDict{},
 		opts:         &syntax.FileOptions{},
 		predeclared:  starlark.StringDict{},
 		module_names: nil,
+		reader:       reader,
 	}
 
 	registerDefaultBuiltins(l)
@@ -37,7 +44,7 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 	}
 
 	location := path.Join(l.path, name)
-	contents, err := os.ReadFile(location)
+	contents, err := l.reader.ReadFile(location)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +64,44 @@ func (l *Loader) GetAllModuleNames() ([]string, error) {
 		return l.module_names, nil
 	}
 
-	entries, err := os.ReadDir(l.path)
+	filepaths, err := l.reader.ListFiles(l.path)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(filepaths))
+
+	for _, path := range filepaths {
+		if filepath.Ext(path) != ".star" {
+			continue
+		}
+
+		names = append(names, path)
+	}
+
+	l.module_names = names
+
+	return names, nil
+}
+
+func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) {
+	v := starlark.NewBuiltin(name, callback)
+	l.predeclared[name] = v
+}
+
+type sourceFileReader interface {
+	ReadFile(path string) ([]byte, error)
+	ListFiles(path string) ([]string, error)
+}
+
+type filesystemSourceFileReader struct{}
+
+func (fs *filesystemSourceFileReader) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
+
+func (fs *filesystemSourceFileReader) ListFiles(path string) ([]string, error) {
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
@@ -69,19 +113,59 @@ func (l *Loader) GetAllModuleNames() ([]string, error) {
 			continue
 		}
 
-		if filepath.Ext(entry.Name()) != ".star" {
-			continue
-		}
-
 		names = append(names, entry.Name())
 	}
-
-	l.module_names = names
 
 	return names, nil
 }
 
-func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) {
-	v := starlark.NewBuiltin(name, callback)
-	l.predeclared[name] = v
+type inmemorySourceFileReader struct {
+	path  string
+	files map[string][]byte
+}
+
+func newInMemorySourceFileReader(path string) *inmemorySourceFileReader {
+	return &inmemorySourceFileReader{
+		path:  path,
+		files: map[string][]byte{},
+	}
+}
+
+func (im *inmemorySourceFileReader) AddFile(path string, contents []byte) error {
+	pathWithStem := filepath.Join(im.path, path)
+
+	if _, exists := im.files[pathWithStem]; exists {
+		return os.ErrExist
+	}
+
+	im.files[pathWithStem] = contents
+
+	return nil
+}
+
+func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
+	if contents, found := im.files[path]; found {
+		return contents, nil
+	} else {
+		return nil, os.ErrNotExist
+	}
+}
+
+func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
+	names := make([]string, 0, len(im.files))
+
+	for name, _ := range im.files {
+		relative, err := filepath.Rel(path, name)
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.HasPrefix(relative, "..") || relative == ".." {
+			continue
+		}
+
+		names = append(names, relative)
+	}
+
+	return names, nil
 }
