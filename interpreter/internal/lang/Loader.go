@@ -38,6 +38,11 @@ func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 	return l
 }
 
+func (l *Loader) IsLoaded(name string) bool {
+	_, ok := l.modules[name]
+	return ok
+}
+
 func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict, error) {
 	if m, ok := l.modules[name]; ok {
 		return m, nil
