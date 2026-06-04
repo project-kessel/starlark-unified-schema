@@ -111,7 +111,7 @@ func (p *Processor) Visit(visitor output.SchemaVisitor) error {
 
 		var commonFields []any
 		if res.common != nil {
-			fields, err := visitFieldDict(res.common, visitor)
+			fields, err := visitMembers(res.common, visitor)
 			if err != nil {
 				return fmt.Errorf("error visiting common fields of %s: %w", res.name, err)
 			}
@@ -120,7 +120,7 @@ func (p *Processor) Visit(visitor output.SchemaVisitor) error {
 
 		reporterGroups := map[string][]any{}
 		for reporterName, reporterDict := range res.reporters {
-			fields, err := visitFieldDict(reporterDict, visitor)
+			fields, err := visitMembers(reporterDict, visitor)
 			if err != nil {
 				return fmt.Errorf("error visiting reporter %s fields of %s: %w", reporterName, res.name, err)
 			}
@@ -133,7 +133,7 @@ func (p *Processor) Visit(visitor output.SchemaVisitor) error {
 	return nil
 }
 
-func visitFieldDict(fields *starlark.Dict, visitor output.SchemaVisitor) ([]any, error) {
+func visitMembers(fields *starlark.Dict, visitor output.SchemaVisitor) ([]any, error) {
 	var result []any
 	for _, item := range fields.Items() {
 		key, ok := item[0].(starlark.String)
@@ -144,7 +144,16 @@ func visitFieldDict(fields *starlark.Dict, visitor output.SchemaVisitor) ([]any,
 
 		fieldStruct, ok := item[1].(*starlarkstruct.Struct)
 		if !ok {
-			return nil, fmt.Errorf("field %s: value must be a struct (from field()), got %s", fieldName, item[1].Type())
+			continue
+		}
+
+		kind, err := getStringAttr("kind", fieldStruct)
+		if err != nil {
+			continue
+		}
+
+		if kind != "field" {
+			continue
 		}
 
 		required, err := getBoolAttr("required", fieldStruct)
