@@ -75,6 +75,10 @@ func (p *Processor) ProcessModule(name string) error {
 			}
 		}
 
+		if reporter == "" {
+			continue
+		}
+
 		fieldsVal, err := s.Attr("fields")
 		if err == nil {
 			if fieldsDict, ok := fieldsVal.(*starlark.Dict); ok {
