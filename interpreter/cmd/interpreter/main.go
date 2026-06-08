@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/project-kessel/starlark-unified-schema/internal/jsonschema"
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
-	"github.com/project-kessel/starlark-unified-schema/internal/output"
 )
 
 func main() {
@@ -25,24 +25,27 @@ func main() {
 	loader := lang.NewLoader(*srcDir)
 	processor := lang.NewProcessor(loader)
 
-	if err := processor.ProcessAllModules(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error processing modules: %v\n", err)
+	resources, err := processor.ProcessAll()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error processing resources: %v\n", err)
 		os.Exit(1)
 	}
 
-	jsonSchemaVisitor := output.NewJSONSchemaVisitor()
-	if err := processor.Visit(jsonSchemaVisitor); err != nil {
-		fmt.Fprintf(os.Stderr, "Error visiting resources: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(jsonSchemaVisitor.Outputs) == 0 {
+	if len(resources) == 0 {
 		fmt.Println("No schemas generated.")
 		return
 	}
 
+	visitor := jsonschema.NewVisitor()
+	for _, res := range resources {
+		if err := visitor.VisitResource(res); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating schema for %s: %v\n", res.Name, err)
+			os.Exit(1)
+		}
+	}
+
 	fmt.Printf("Writing schemas to %s/\n", *outputDir)
-	if err := output.WriteSchemas(*outputDir, jsonSchemaVisitor.Outputs); err != nil {
+	if err := jsonschema.WriteSchemas(*outputDir, visitor.Outputs); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing schemas: %v\n", err)
 		os.Exit(1)
 	}

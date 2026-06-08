@@ -13,12 +13,11 @@ func registerDefaultBuiltins(l *Loader) {
 	l.RegisterBuiltin("println", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		chunks := make([]string, 0, len(args))
 		for _, v := range args {
-			s, err := convert_to_string(v)
-			if err != nil {
-				return starlark.None, err
+			s, ok := v.(starlark.String)
+			if !ok {
+				return starlark.None, fmt.Errorf("println: expected string, got %s", v.Type())
 			}
-
-			chunks = append(chunks, s)
+			chunks = append(chunks, string(s))
 		}
 
 		fmt.Println(chunks)

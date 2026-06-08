@@ -15,15 +15,15 @@ type Loader struct {
 	modules      map[string]starlark.StringDict
 	opts         *syntax.FileOptions
 	predeclared  starlark.StringDict
-	reader       sourceFileReader
+	reader       SourceFileReader
 	module_names []string
 }
 
 func NewLoader(path string) *Loader {
-	return newLoaderForReader(path, &filesystemSourceFileReader{})
+	return NewLoaderForReader(path, &filesystemSourceFileReader{})
 }
 
-func newLoaderForReader(path string, reader sourceFileReader) *Loader {
+func NewLoaderForReader(path string, reader SourceFileReader) *Loader {
 	l := &Loader{
 		path:         path,
 		modules:      map[string]starlark.StringDict{},
@@ -94,7 +94,7 @@ func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thr
 	l.predeclared[name] = v
 }
 
-type sourceFileReader interface {
+type SourceFileReader interface {
 	ReadFile(path string) ([]byte, error)
 	ListFiles(path string) ([]string, error)
 }
@@ -131,19 +131,19 @@ func (fs *filesystemSourceFileReader) ListFiles(root string) ([]string, error) {
 	return names, nil
 }
 
-type inmemorySourceFileReader struct {
+type InMemorySourceFileReader struct {
 	path  string
 	files map[string][]byte
 }
 
-func newInMemorySourceFileReader(path string) *inmemorySourceFileReader {
-	return &inmemorySourceFileReader{
+func NewInMemorySourceFileReader(path string) *InMemorySourceFileReader {
+	return &InMemorySourceFileReader{
 		path:  path,
 		files: map[string][]byte{},
 	}
 }
 
-func (im *inmemorySourceFileReader) AddFile(path string, contents []byte) error {
+func (im *InMemorySourceFileReader) AddFile(path string, contents []byte) error {
 	pathWithStem := filepath.Join(im.path, path)
 
 	if _, exists := im.files[pathWithStem]; exists {
@@ -155,7 +155,7 @@ func (im *inmemorySourceFileReader) AddFile(path string, contents []byte) error 
 	return nil
 }
 
-func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
+func (im *InMemorySourceFileReader) ReadFile(path string) ([]byte, error) {
 	if contents, found := im.files[path]; found {
 		return contents, nil
 	} else {
@@ -163,10 +163,10 @@ func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
 	}
 }
 
-func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
+func (im *InMemorySourceFileReader) ListFiles(path string) ([]string, error) {
 	names := make([]string, 0, len(im.files))
 
-	for name, _ := range im.files {
+	for name := range im.files {
 		relative, err := filepath.Rel(path, name)
 		if err != nil {
 			return nil, err

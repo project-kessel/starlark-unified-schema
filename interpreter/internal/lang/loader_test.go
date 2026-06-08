@@ -81,9 +81,9 @@ spy(message)`))
 
 }
 
-func createDefaultLoaderReaderAndThread() (*Loader, *inmemorySourceFileReader, *starlark.Thread) {
-	reader := newInMemorySourceFileReader("schema")
-	loader := newLoaderForReader("schema", reader)
+func createDefaultLoaderReaderAndThread() (*Loader, *InMemorySourceFileReader, *starlark.Thread) {
+	reader := NewInMemorySourceFileReader("schema")
+	loader := NewLoaderForReader("schema", reader)
 	thread := &starlark.Thread{
 		Name: "test",
 		Load: loader.Load,

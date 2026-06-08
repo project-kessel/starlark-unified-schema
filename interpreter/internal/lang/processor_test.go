@@ -3,7 +3,7 @@ package lang
 import (
 	"testing"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/output"
+	"github.com/project-kessel/starlark-unified-schema/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,34 +27,37 @@ def union(left, right):
     return struct(kind="union", left=left, right=right)
 `
 
-func setupProcessorWithKessel(t *testing.T, reader *inmemorySourceFileReader) *Processor {
+func setupProcessorWithKessel(t *testing.T, reader *InMemorySourceFileReader) *Processor {
 	t.Helper()
 
 	if err := reader.AddFile("kessel.star", []byte(kesselStarContent)); err != nil {
 		t.Fatalf("failed to add kessel.star: %v", err)
 	}
 
-	loader := newLoaderForReader("schema", reader)
+	loader := NewLoaderForReader("schema", reader)
 	return NewProcessor(loader)
 }
 
-func processAndVisit(t *testing.T, processor *Processor) *output.SpyVisitor {
+func processAndVisit(t *testing.T, processor *Processor) *util.SpyVisitor {
 	t.Helper()
 
-	if err := processor.ProcessAllModules(); err != nil {
-		t.Fatalf("ProcessAllModules failed: %v", err)
+	resources, err := processor.ProcessAll()
+	if err != nil {
+		t.Fatalf("ProcessAll failed: %v", err)
 	}
 
-	spy := output.NewSpyVisitor()
-	if err := processor.Visit(spy); err != nil {
-		t.Fatalf("Visit failed: %v", err)
+	spy := util.NewSpyVisitor()
+	for _, res := range resources {
+		if err := spy.VisitResource(res); err != nil {
+			t.Fatalf("VisitResource failed: %v", err)
+		}
 	}
 
 	return spy
 }
 
 func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
@@ -87,7 +90,7 @@ host = resource("hbi", common, {
 }
 
 func TestProcessorCommonOnlyFileProducesNoResources(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
@@ -104,7 +107,7 @@ host = {
 }
 
 func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/reporters/hbi/host.star", []byte(`
@@ -123,7 +126,7 @@ host = resource("hbi", fields={
 })
 `))
 
-	err := processor.ProcessAllModules()
+	_, err := processor.ProcessAll()
 
 	if !assert.Error(t, err) {
 		return
@@ -132,7 +135,7 @@ host = resource("hbi", fields={
 }
 
 func TestProcessorSkipsLibraryModules(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	spy := processAndVisit(t, processor)
@@ -141,7 +144,7 @@ func TestProcessorSkipsLibraryModules(t *testing.T) {
 }
 
 func TestProcessorMultipleReportersMerge(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
