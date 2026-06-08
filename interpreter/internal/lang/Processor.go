@@ -69,7 +69,7 @@ func (p *Processor) ProcessModule(name string) error {
 		commonVal, err := s.Attr("common")
 		if err == nil {
 			if commonDict, ok := commonVal.(*starlark.Dict); ok {
-				if merged.common == nil {
+				if merged.common == nil || merged.common.Len() == 0 {
 					merged.common = commonDict
 				}
 			}
