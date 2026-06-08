@@ -39,3 +39,78 @@ func (v *SpyVisitor) AssertJSON(t *testing.T, expected string) bool {
 
 	return assert.JSONEq(t, expected, string(actual))
 }
+
+func (V *SpyVisitor) VisitAnd(left any, right any) any {
+	return node{
+		"kind":  "and",
+		"left":  left,
+		"right": right,
+	}
+}
+
+func (V *SpyVisitor) VisitOr(left any, right any) any {
+	return node{
+		"kind":  "or",
+		"left":  left,
+		"right": right,
+	}
+}
+
+func (V *SpyVisitor) VisitUnless(left any, right any) any {
+	return node{
+		"kind":  "unless",
+		"left":  left,
+		"right": right,
+	}
+}
+
+func (V *SpyVisitor) VisitRelationExpression(name string) any {
+	return node{
+		"kind": "ref",
+		"name": name,
+	}
+}
+
+func (V *SpyVisitor) VisitSubRelationExpression(name string, sub string) any {
+	return node{
+		"kind": "subref",
+		"name": name,
+		"sub":  sub,
+	}
+}
+
+func (V *SpyVisitor) VisitAssignableExpression(typeNamespace string, typeName string, cardinality string) any {
+	return node{
+		"kind":          "assignable",
+		"typeNamespace": typeNamespace,
+		"typeName":      typeName,
+		"cardinality":   cardinality,
+	}
+}
+
+func (V *SpyVisitor) BeginRelation(name string) {
+
+}
+
+// Construct relation expression
+func (V *SpyVisitor) VisitRelation(name string, body any) any {
+	return node{
+		"kind": "relation",
+		"name": name,
+		"body": body,
+	}
+}
+
+func (V *SpyVisitor) BeginType(namespace string, name string) {
+
+}
+
+// Construct type expression
+func (V *SpyVisitor) VisitType(namespace string, name string, relations []any) any {
+	return node{
+		"kind":      "type",
+		"namespace": namespace,
+		"name":      name,
+		"relations": relations,
+	}
+}
