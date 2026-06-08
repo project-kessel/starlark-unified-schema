@@ -1,7 +1,5 @@
-load("kessel.star", "resource", "field", "text")
+load("kessel.star", "field", "text")
 
-host = resource(
-    common = {
-        "workspace_id": field(type=text(), required=True),
-    },
-)
+host = {
+    "workspace_id": field(type=text(), required=True),
+}

@@ -8,7 +8,7 @@ import (
 )
 
 const kesselStarContent = `
-def resource(reporter="", common={}, fields={}):
+def resource(reporter, common={}, fields={}):
     return struct(kind="resource", reporter=reporter, common=common, fields=fields)
 
 def field(type, required=False, description=None):
@@ -58,22 +58,21 @@ func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
-load("kessel.star", "resource", "field", "text")
+load("kessel.star", "field", "text")
 
-host = resource(
-    common = {
-        "workspace_id": field(type=text(), required=True),
-    },
-)`))
+host = {
+    "workspace_id": field(type=text(), required=True),
+}
+`))
 
 	reader.AddFile("host/reporters/hbi/host.star", []byte(`
 load("kessel.star", "resource", "field", "uuid")
+load("host/common_representation.star", common="host")
 
-host = resource(reporter="hbi",
-    fields = {
-        "insights_id": field(type=uuid()),
-    },
-)`))
+host = resource("hbi", common, {
+    "insights_id": field(type=uuid()),
+})
+`))
 
 	spy := processAndVisit(t, processor)
 
@@ -87,27 +86,21 @@ host = resource(reporter="hbi",
 	}`)
 }
 
-func TestProcessorCommonOnlyResource(t *testing.T) {
+func TestProcessorCommonOnlyFileProducesNoResources(t *testing.T) {
 	reader := newInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
-load("kessel.star", "resource", "field", "text")
+load("kessel.star", "field", "text")
 
-host = resource(
-    common = {
-        "workspace_id": field(type=text(), required=True),
-    },
-)`))
+host = {
+    "workspace_id": field(type=text(), required=True),
+}
+`))
 
 	spy := processAndVisit(t, processor)
 
-	spy.AssertJSON(t, `{
-		"host": {
-			"common": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
-			"reporters": {}
-		}
-	}`)
+	spy.AssertJSON(t, `{}`)
 }
 
 func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
@@ -117,20 +110,18 @@ func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
 	reader.AddFile("host/reporters/hbi/host.star", []byte(`
 load("kessel.star", "resource", "field", "uuid")
 
-host = resource(reporter="hbi",
-    fields = {
-        "insights_id": field(type=uuid()),
-    },
-)`))
+host = resource("hbi", fields={
+    "insights_id": field(type=uuid()),
+})
+`))
 
 	reader.AddFile("host/reporters/hbi/duplicate.star", []byte(`
 load("kessel.star", "resource", "field", "uuid")
 
-host = resource(reporter="hbi",
-    fields = {
-        "satellite_id": field(type=uuid()),
-    },
-)`))
+host = resource("hbi", fields={
+    "satellite_id": field(type=uuid()),
+})
+`))
 
 	err := processor.ProcessAllModules()
 
@@ -153,29 +144,37 @@ func TestProcessorMultipleReportersMerge(t *testing.T) {
 	reader := newInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
+	reader.AddFile("host/common_representation.star", []byte(`
+load("kessel.star", "field", "text")
+
+host = {
+    "workspace_id": field(type=text(), required=True),
+}
+`))
+
 	reader.AddFile("host/reporters/hbi/host.star", []byte(`
 load("kessel.star", "resource", "field", "uuid")
+load("host/common_representation.star", common="host")
 
-host = resource(reporter="hbi",
-    fields = {
-        "insights_id": field(type=uuid()),
-    },
-)`))
+host = resource("hbi", common, {
+    "insights_id": field(type=uuid()),
+})
+`))
 
 	reader.AddFile("host/reporters/acm/host.star", []byte(`
 load("kessel.star", "resource", "field", "text")
+load("host/common_representation.star", common="host")
 
-host = resource(reporter="acm",
-    fields = {
-        "cluster_id": field(type=text(), required=True),
-    },
-)`))
+host = resource("acm", common, {
+    "cluster_id": field(type=text(), required=True),
+})
+`))
 
 	spy := processAndVisit(t, processor)
 
 	spy.AssertJSON(t, `{
 		"host": {
-			"common": null,
+			"common": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
 			"reporters": {
 				"acm": [{"name": "cluster_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
 				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]

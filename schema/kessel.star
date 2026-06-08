@@ -1,4 +1,4 @@
-def resource(reporter="", common={}, fields={}):
+def resource(reporter, common={}, fields={}):
     return struct(kind="resource", reporter=reporter, common=common, fields=fields)
 
 def text(minLength=None, maxLength=None, regex=None):
