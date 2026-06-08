@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/domain"
+	"github.com/project-kessel/starlark-unified-schema/internal/model"
 )
 
 type Visitor struct {
@@ -15,7 +15,7 @@ func NewVisitor() *Visitor {
 	return &Visitor{}
 }
 
-func (v *Visitor) VisitResource(resource domain.Resource) error {
+func (v *Visitor) VisitResource(resource model.Resource) error {
 	commonSchema := v.buildFieldsSchema(resource.Common)
 	commonSchema.SchemaURI = schemaURI
 	v.Outputs = append(v.Outputs, OutputEntry{
@@ -35,7 +35,7 @@ func (v *Visitor) VisitResource(resource domain.Resource) error {
 	return nil
 }
 
-func (v *Visitor) buildFieldsSchema(fields []domain.Field) *Schema {
+func (v *Visitor) buildFieldsSchema(fields []model.Field) *Schema {
 	schema := &Schema{
 		Type:       "object",
 		Properties: map[string]*Schema{},
@@ -60,7 +60,7 @@ func (v *Visitor) buildFieldsSchema(fields []domain.Field) *Schema {
 	return schema
 }
 
-func (v *Visitor) convertField(f domain.Field) *Schema {
+func (v *Visitor) convertField(f model.Field) *Schema {
 	schema := v.convertDataType(f.Type)
 	if f.Description != nil {
 		schema.Description = *f.Description
@@ -68,7 +68,7 @@ func (v *Visitor) convertField(f domain.Field) *Schema {
 	return schema
 }
 
-func (v *Visitor) convertDataType(dt domain.DataType) *Schema {
+func (v *Visitor) convertDataType(dt model.DataType) *Schema {
 	switch dt.Kind {
 	case "text":
 		s := &Schema{Type: "string"}

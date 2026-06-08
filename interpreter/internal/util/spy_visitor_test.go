@@ -3,20 +3,20 @@ package util
 import (
 	"testing"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/domain"
+	"github.com/project-kessel/starlark-unified-schema/internal/model"
 )
 
 func TestSpyVisitorCapturesResource(t *testing.T) {
 	spy := NewSpyVisitor()
 
-	resource := domain.Resource{
+	resource := model.Resource{
 		Name: "host",
-		Common: []domain.Field{
-			{Name: "workspace_id", Required: true, Type: domain.DataType{Kind: "text"}},
+		Common: []model.Field{
+			{Name: "workspace_id", Required: true, Type: model.DataType{Kind: "text"}},
 		},
-		Reporters: map[string][]domain.Field{
+		Reporters: map[string][]model.Field{
 			"hbi": {
-				{Name: "insights_id", Required: false, Type: domain.DataType{Kind: "uuid"}},
+				{Name: "insights_id", Required: false, Type: model.DataType{Kind: "uuid"}},
 			},
 		},
 	}

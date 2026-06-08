@@ -3,7 +3,7 @@ package lang
 import (
 	"fmt"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/domain"
+	"github.com/project-kessel/starlark-unified-schema/internal/model"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
@@ -29,7 +29,7 @@ func NewProcessor(loader *Loader) *Processor {
 	}
 }
 
-func (p *Processor) ProcessAll() ([]domain.Resource, error) {
+func (p *Processor) ProcessAll() ([]model.Resource, error) {
 	names, err := p.loader.GetAllModuleNames()
 	if err != nil {
 		return nil, err
@@ -108,13 +108,13 @@ func (p *Processor) processModule(name string) error {
 	return nil
 }
 
-func (p *Processor) buildResources() ([]domain.Resource, error) {
-	resources := make([]domain.Resource, 0, len(p.order))
+func (p *Processor) buildResources() ([]model.Resource, error) {
+	resources := make([]model.Resource, 0, len(p.order))
 
 	for _, name := range p.order {
 		merged := p.resources[name]
 
-		var commonFields []domain.Field
+		var commonFields []model.Field
 		if merged.common != nil {
 			fields, err := extractFields(merged.common)
 			if err != nil {
@@ -123,7 +123,7 @@ func (p *Processor) buildResources() ([]domain.Resource, error) {
 			commonFields = fields
 		}
 
-		reporters := map[string][]domain.Field{}
+		reporters := map[string][]model.Field{}
 		for reporterName, dict := range merged.reporters {
 			fields, err := extractFields(dict)
 			if err != nil {
@@ -132,7 +132,7 @@ func (p *Processor) buildResources() ([]domain.Resource, error) {
 			reporters[reporterName] = fields
 		}
 
-		resources = append(resources, domain.Resource{
+		resources = append(resources, model.Resource{
 			Name:      name,
 			Common:    commonFields,
 			Reporters: reporters,
@@ -142,8 +142,8 @@ func (p *Processor) buildResources() ([]domain.Resource, error) {
 	return resources, nil
 }
 
-func extractFields(dict *starlark.Dict) ([]domain.Field, error) {
-	var fields []domain.Field
+func extractFields(dict *starlark.Dict) ([]model.Field, error) {
+	var fields []model.Field
 	for _, item := range dict.Items() {
 		key, ok := item[0].(starlark.String)
 		if !ok {
@@ -182,7 +182,7 @@ func extractFields(dict *starlark.Dict) ([]domain.Field, error) {
 			return nil, fmt.Errorf("error extracting data type for field %s: %w", fieldName, err)
 		}
 
-		fields = append(fields, domain.Field{
+		fields = append(fields, model.Field{
 			Name:        fieldName,
 			Required:    required,
 			Description: description,
@@ -193,20 +193,20 @@ func extractFields(dict *starlark.Dict) ([]domain.Field, error) {
 	return fields, nil
 }
 
-func extractDataType(v starlark.Value) (domain.DataType, error) {
+func extractDataType(v starlark.Value) (model.DataType, error) {
 	typeStruct, ok := v.(*starlarkstruct.Struct)
 	if !ok {
-		return domain.DataType{}, fmt.Errorf("expected struct for data type, got %s", v.Type())
+		return model.DataType{}, fmt.Errorf("expected struct for data type, got %s", v.Type())
 	}
 
 	kind, err := getStringAttr("kind", typeStruct)
 	if err != nil {
-		return domain.DataType{}, err
+		return model.DataType{}, err
 	}
 
 	switch kind {
 	case "text":
-		return domain.DataType{
+		return model.DataType{
 			Kind:      "text",
 			MinLength: getOptionalIntAttr("minLength", typeStruct),
 			MaxLength: getOptionalIntAttr("maxLength", typeStruct),
@@ -214,110 +214,110 @@ func extractDataType(v starlark.Value) (domain.DataType, error) {
 		}, nil
 
 	case "uuid":
-		return domain.DataType{Kind: "uuid"}, nil
+		return model.DataType{Kind: "uuid"}, nil
 
 	case "numeric_id":
-		return domain.DataType{
+		return model.DataType{
 			Kind: "numeric_id",
 			Min:  getOptionalIntAttr("min", typeStruct),
 			Max:  getOptionalIntAttr("max", typeStruct),
 		}, nil
 
 	case "boolean":
-		return domain.DataType{Kind: "boolean"}, nil
+		return model.DataType{Kind: "boolean"}, nil
 
 	case "date_time":
-		return domain.DataType{Kind: "date_time"}, nil
+		return model.DataType{Kind: "date_time"}, nil
 
 	case "enum":
 		valuesVal, err := typeStruct.Attr("values")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'values' on enum: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'values' on enum: %w", err)
 		}
 		values, err := extractStringList(valuesVal, "enum values")
 		if err != nil {
-			return domain.DataType{}, err
+			return model.DataType{}, err
 		}
-		return domain.DataType{Kind: "enum", Values: values}, nil
+		return model.DataType{Kind: "enum", Values: values}, nil
 
 	case "nullable":
 		innerVal, err := typeStruct.Attr("inner")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'inner' on nullable: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'inner' on nullable: %w", err)
 		}
 		inner, err := extractDataType(innerVal)
 		if err != nil {
-			return domain.DataType{}, err
+			return model.DataType{}, err
 		}
-		return domain.DataType{Kind: "nullable", Inner: &inner}, nil
+		return model.DataType{Kind: "nullable", Inner: &inner}, nil
 
 	case "union":
 		leftVal, err := typeStruct.Attr("left")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'left' on union: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'left' on union: %w", err)
 		}
 		left, err := extractDataType(leftVal)
 		if err != nil {
-			return domain.DataType{}, err
+			return model.DataType{}, err
 		}
 
 		rightVal, err := typeStruct.Attr("right")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'right' on union: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'right' on union: %w", err)
 		}
 		right, err := extractDataType(rightVal)
 		if err != nil {
-			return domain.DataType{}, err
+			return model.DataType{}, err
 		}
-		return domain.DataType{Kind: "union", Members: []domain.DataType{left, right}}, nil
+		return model.DataType{Kind: "union", Members: []model.DataType{left, right}}, nil
 
 	case "array":
 		itemsVal, err := typeStruct.Attr("items")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'items' on array: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'items' on array: %w", err)
 		}
 		items, err := extractDataType(itemsVal)
 		if err != nil {
-			return domain.DataType{}, err
+			return model.DataType{}, err
 		}
-		return domain.DataType{Kind: "array", Items: &items}, nil
+		return model.DataType{Kind: "array", Items: &items}, nil
 
 	case "object":
 		propsVal, err := typeStruct.Attr("properties")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'properties' on object: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'properties' on object: %w", err)
 		}
 		propsDict, ok := propsVal.(*starlark.Dict)
 		if !ok {
-			return domain.DataType{}, fmt.Errorf("object 'properties' must be a dict, got %s", propsVal.Type())
+			return model.DataType{}, fmt.Errorf("object 'properties' must be a dict, got %s", propsVal.Type())
 		}
 
 		requiredVal, err := typeStruct.Attr("required")
 		if err != nil {
-			return domain.DataType{}, fmt.Errorf("error accessing 'required' on object: %w", err)
+			return model.DataType{}, fmt.Errorf("error accessing 'required' on object: %w", err)
 		}
 		required, err := extractStringList(requiredVal, "object required")
 		if err != nil {
-			return domain.DataType{}, err
+			return model.DataType{}, err
 		}
 
-		var properties []domain.Field
+		var properties []model.Field
 		for _, item := range propsDict.Items() {
 			propKey, ok := item[0].(starlark.String)
 			if !ok {
-				return domain.DataType{}, fmt.Errorf("object property key must be a string, got %s", item[0].Type())
+				return model.DataType{}, fmt.Errorf("object property key must be a string, got %s", item[0].Type())
 			}
 			propName := string(propKey)
 			propType, err := extractDataType(item[1])
 			if err != nil {
-				return domain.DataType{}, fmt.Errorf("error extracting property %s: %w", propName, err)
+				return model.DataType{}, fmt.Errorf("error extracting property %s: %w", propName, err)
 			}
-			properties = append(properties, domain.Field{Name: propName, Type: propType})
+			properties = append(properties, model.Field{Name: propName, Type: propType})
 		}
 
-		return domain.DataType{Kind: "object", Properties: properties, Required: required}, nil
+		return model.DataType{Kind: "object", Properties: properties, Required: required}, nil
 
 	default:
-		return domain.DataType{}, fmt.Errorf("unmatched data type kind: %s", kind)
+		return model.DataType{}, fmt.Errorf("unmatched data type kind: %s", kind)
 	}
 }

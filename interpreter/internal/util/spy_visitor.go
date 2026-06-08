@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/domain"
+	"github.com/project-kessel/starlark-unified-schema/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func NewSpyVisitor() *SpyVisitor {
 	}
 }
 
-func (v *SpyVisitor) VisitResource(resource domain.Resource) error {
+func (v *SpyVisitor) VisitResource(resource model.Resource) error {
 	commonFields := make([]any, 0, len(resource.Common))
 	for _, f := range resource.Common {
 		commonFields = append(commonFields, v.visitField(f))
@@ -39,7 +39,7 @@ func (v *SpyVisitor) VisitResource(resource domain.Resource) error {
 	return nil
 }
 
-func (v *SpyVisitor) visitField(f domain.Field) node {
+func (v *SpyVisitor) visitField(f model.Field) node {
 	result := node{"name": f.Name, "required": f.Required, "type": v.visitDataType(f.Type)}
 	if f.Description != nil {
 		result["description"] = *f.Description
@@ -47,7 +47,7 @@ func (v *SpyVisitor) visitField(f domain.Field) node {
 	return result
 }
 
-func (v *SpyVisitor) visitDataType(dt domain.DataType) node {
+func (v *SpyVisitor) visitDataType(dt model.DataType) node {
 	switch dt.Kind {
 	case "text":
 		return node{"kind": "text", "minLength": dt.MinLength, "maxLength": dt.MaxLength, "regex": dt.Regex}
