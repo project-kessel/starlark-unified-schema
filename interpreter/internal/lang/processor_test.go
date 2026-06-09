@@ -131,6 +131,42 @@ func TestProcessorSkipsLibraryModules(t *testing.T) {
 	assert.Empty(t, resources)
 }
 
+func TestProcessorRejectsNonStructFieldEntry(t *testing.T) {
+	reader := NewInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+load("kessel.star", "resource", "field", "uuid")
+
+host = resource("hbi", fields={
+    "insights_id": "not a field struct",
+})
+`))
+
+	_, err := processor.ProcessAll()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `field insights_id: expected struct`)
+}
+
+func TestProcessorRejectsWrongFieldKind(t *testing.T) {
+	reader := NewInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+load("kessel.star", "resource", "field", "uuid")
+
+host = resource("hbi", fields={
+    "insights_id": struct(kind="uuid"),
+})
+`))
+
+	_, err := processor.ProcessAll()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `field insights_id: expected kind "field"`)
+}
+
 func TestProcessorMultipleReportersMerge(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)

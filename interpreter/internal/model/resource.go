@@ -28,46 +28,74 @@ type DataType struct {
 	Values     []string
 }
 
-func (r *Resource) Accept(v SchemaVisitor) any {
+func (r *Resource) Accept(v SchemaVisitor) error {
 	common := make([]any, len(r.Common))
 	for i := range r.Common {
-		common[i] = r.Common[i].Accept(v)
+		result, err := r.Common[i].Accept(v)
+		if err != nil {
+			return err
+		}
+		common[i] = result
 	}
 
 	reporters := map[string][]any{}
 	for name, fields := range r.Reporters {
 		group := make([]any, len(fields))
 		for i := range fields {
-			group[i] = fields[i].Accept(v)
+			result, err := fields[i].Accept(v)
+			if err != nil {
+				return err
+			}
+			group[i] = result
 		}
 		reporters[name] = group
 	}
 
-	return v.VisitResource(r, common, reporters)
+	_, err := v.VisitResource(r, common, reporters)
+	return err
 }
 
-func (f *Field) Accept(v SchemaVisitor) any {
-	typeResult := f.Type.Accept(v)
+func (f *Field) Accept(v SchemaVisitor) (any, error) {
+	typeResult, err := f.Type.Accept(v)
+	if err != nil {
+		return nil, err
+	}
 	return v.VisitField(f, typeResult)
 }
 
-func (dt *DataType) Accept(v SchemaVisitor) any {
+func (dt *DataType) Accept(v SchemaVisitor) (any, error) {
 	var children []any
 
 	switch dt.Kind {
 	case "nullable":
-		children = []any{dt.Inner.Accept(v)}
+		inner, err := dt.Inner.Accept(v)
+		if err != nil {
+			return nil, err
+		}
+		children = []any{inner}
 	case "union":
 		children = make([]any, len(dt.Members))
 		for i := range dt.Members {
-			children[i] = dt.Members[i].Accept(v)
+			result, err := dt.Members[i].Accept(v)
+			if err != nil {
+				return nil, err
+			}
+			children[i] = result
 		}
 	case "array":
-		children = []any{dt.Items.Accept(v)}
+		items, err := dt.Items.Accept(v)
+		if err != nil {
+			return nil, err
+		}
+		children = []any{items}
 	case "object":
 		children = make([]any, len(dt.Properties))
 		for i := range dt.Properties {
-			children[i] = dt.Properties[i].Accept(v)
+			result, err := dt.Properties[i].Accept(v)
+			if err != nil {
+				return nil, err
+			}
+			children[i] = result
 		}
 	}
 

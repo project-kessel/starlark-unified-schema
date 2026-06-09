@@ -153,16 +153,16 @@ func extractFields(dict *starlark.Dict) ([]model.Field, error) {
 
 		fieldStruct, ok := item[1].(*starlarkstruct.Struct)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("field %s: expected struct, got %s", fieldName, item[1].Type())
 		}
 
 		kind, err := getStringAttr("kind", fieldStruct)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("field %s: %w", fieldName, err)
 		}
 
 		if kind != "field" {
-			continue
+			return nil, fmt.Errorf("field %s: expected kind %q, got %q", fieldName, "field", kind)
 		}
 
 		required, err := getBoolAttr("required", fieldStruct)

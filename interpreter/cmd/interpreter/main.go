@@ -38,7 +38,10 @@ func main() {
 
 	visitor := jsonschema.NewVisitor()
 	for i := range resources {
-		resources[i].Accept(visitor)
+		if err := resources[i].Accept(visitor); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating schema for %s: %v\n", resources[i].Name, err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Printf("Writing schemas to %s/\n", *outputDir)
