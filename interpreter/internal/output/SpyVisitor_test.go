@@ -5,7 +5,15 @@ import "testing"
 func TestTemp(t *testing.T) {
 	spy := NewSpyVisitor()
 
-	spy.TempAdd("foo", "bar")
+	spy.BeginType("test", "resource")
+	spy.VisitType("test", "resource", []any{})
 
-	spy.AssertJSON(t, `{"foo": "bar"}`)
+	spy.AssertJSON(t,
+		`
+[{
+	"kind":"type",
+	"name":"resource",
+	"namespace": "test",
+	"relations":[]
+}]`)
 }

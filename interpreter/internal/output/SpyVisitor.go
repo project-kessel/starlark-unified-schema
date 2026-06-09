@@ -8,12 +8,12 @@ import (
 )
 
 type SpyVisitor struct {
-	root node
+	root []node
 }
 
 func NewSpyVisitor() *SpyVisitor {
 	return &SpyVisitor{
-		root: make(node),
+		root: []node{},
 	}
 }
 
@@ -23,11 +23,6 @@ Then at the top, some top-level container (ex: VisitReporter) becomes a containe
 The content of a visitor can then be asserted as equivalent to a given golden json.
 
 ***/
-
-func (v *SpyVisitor) TempAdd(name string, value any) {
-	//This function (and associated test) can be removed when there are actual functions
-	v.root[name] = value
-}
 
 type node map[string]any
 
@@ -107,10 +102,14 @@ func (V *SpyVisitor) BeginType(namespace string, name string) {
 
 // Construct type expression
 func (V *SpyVisitor) VisitType(namespace string, name string, relations []any) any {
-	return node{
+	result := node{
 		"kind":      "type",
 		"namespace": namespace,
 		"name":      name,
 		"relations": relations,
 	}
+
+	V.root = append(V.root, result)
+
+	return result
 }

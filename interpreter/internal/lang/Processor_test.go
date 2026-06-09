@@ -21,21 +21,27 @@ resource = resource_type({
 	})
 `,
 		`
+[{
+	"kind":"type",
+	"namespace":"test",
+	"name":"other",
+	"relations":[]
+},
 {
 	"kind":"type", 
 	"namespace":"test", 
 	"name":"resource", 
-	"relations":{
-		"kind":"relation", 
-		"name":"other", 
+	"relations":[{
+		"kind":"relation",
+		"name":"other",
 		"body": {
 			"kind":"assignable",
 			"typeNamespace":"test",
 			"typeName":"other",
 			"cardinality":"AtMostOne"
 		}
-	}
-}`)
+	}]
+}]`)
 }
 
 func assertSourceMatchesGolden(t *testing.T, source string, golden string) {
