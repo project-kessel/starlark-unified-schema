@@ -3,7 +3,7 @@ package lang
 import (
 	"testing"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/output"
+	"github.com/project-kessel/starlark-unified-schema/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,14 +38,14 @@ func setupProcessorWithKessel(t *testing.T, reader *inmemorySourceFileReader) *P
 	return NewProcessor(loader)
 }
 
-func processAndVisit(t *testing.T, processor *Processor) *output.SpyVisitor {
+func processAndVisit(t *testing.T, processor *Processor) *util.SpyVisitor {
 	t.Helper()
 
 	if err := processor.ProcessAllModules(); err != nil {
 		t.Fatalf("ProcessAllModules failed: %v", err)
 	}
 
-	spy := output.NewSpyVisitor()
+	spy := util.NewSpyVisitor()
 	if err := processor.Visit(spy); err != nil {
 		t.Fatalf("Visit failed: %v", err)
 	}

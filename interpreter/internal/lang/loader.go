@@ -16,7 +16,7 @@ type Loader struct {
 	opts         *syntax.FileOptions
 	predeclared  starlark.StringDict
 	reader       sourceFileReader
-	module_names []string
+	moduleNames []string
 }
 
 func NewLoader(path string) *Loader {
@@ -29,7 +29,7 @@ func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 		modules:      map[string]starlark.StringDict{},
 		opts:         &syntax.FileOptions{},
 		predeclared:  starlark.StringDict{},
-		module_names: nil,
+		moduleNames: nil,
 		reader:       reader,
 	}
 
@@ -65,8 +65,8 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 }
 
 func (l *Loader) GetAllModuleNames() ([]string, error) {
-	if l.module_names != nil {
-		return l.module_names, nil
+	if l.moduleNames != nil {
+		return l.moduleNames, nil
 	}
 
 	filepaths, err := l.reader.ListFiles(l.path)
@@ -84,7 +84,7 @@ func (l *Loader) GetAllModuleNames() ([]string, error) {
 		names = append(names, path)
 	}
 
-	l.module_names = names
+	l.moduleNames = names
 
 	return names, nil
 }

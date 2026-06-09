@@ -1,15 +1,18 @@
-package output
+package util
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/project-kessel/starlark-unified-schema/internal/output"
 	"github.com/stretchr/testify/assert"
 )
 
 type SpyVisitor struct {
 	root node
 }
+
+var _ output.SchemaVisitor = (*SpyVisitor)(nil)
 
 func NewSpyVisitor() *SpyVisitor {
 	return &SpyVisitor{
