@@ -7,19 +7,35 @@ import (
 	"testing"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTemp(t *testing.T) {
 	assertSourceMatchesGolden(t,
 		`
-load("kessel.star", "atMostOne")
-other = {}
+load("kessel.star", "atMostOne", "resource_type")
+other = resource_type({})
 
-resource = {
+resource = resource_type({
 	"other": atMostOne(other)
-}
+	})
 `,
-		`{}`)
+		`
+{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":{
+		"kind":"relation", 
+		"name":"other", 
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"other",
+			"cardinality":"AtMostOne"
+		}
+	}
+}`)
 }
 
 func assertSourceMatchesGolden(t *testing.T, source string, golden string) {
@@ -28,7 +44,10 @@ func assertSourceMatchesGolden(t *testing.T, source string, golden string) {
 
 	reader.AddFile("test.star", []byte(source))
 
-	processor.ProcessModule("test.star", visitor)
+	err := processor.ProcessModule("test.star", visitor)
+	if !assert.NoError(t, err) {
+		return
+	}
 	visitor.AssertJSON(t, golden)
 }
 
@@ -45,5 +64,5 @@ func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {
 	if err != nil {
 		return err
 	}
-	return reader.AddFile(filepath.Join(reader.path, path), contents)
+	return reader.AddFile(path, contents)
 }

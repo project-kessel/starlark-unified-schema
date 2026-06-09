@@ -22,6 +22,13 @@ permissions(service,
         s.parent.does_workspace_have_service_preference
     ),
 
+    "does_workspace_have_service_preference":
+    any(s.parent.does_workspace_have_service_preference
+        .unless(s.denied_workspaces.all_preference_inheriting_children_workspaces),
+       s.allowed_workspaces,
+       s.allowed_workspaces.all_preference_inheriting_children_workspaces
+    ).unless(s.denied_workspaces)
+
     "does_workspace_have_license": lambda(s): s.billing_account.enabled_workspaces,
 
     "can_workspace_use_service": lambda(s): s.does_workspace_have_service_preference.and(s.does_workspace_have_license)

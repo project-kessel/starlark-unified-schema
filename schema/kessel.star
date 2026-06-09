@@ -1,14 +1,13 @@
-def _(left, operator, right):
-    return struct(kind=operator, left=left, right=right)
-
 def self():
-    return struct(kind="selfType")
+    return {
+        "kind": "selfType"
+    }
 
 def _createRelation(kind, type):
-    def sub(name):
-        return struct() #Create a subrelation expression from the name and type
-    
-    return struct(kind=kind, type=type, sub=sub)
+    return {
+        "kind": kind,
+        "type": type,
+    }
 
 def atMostOne(type):
     return _createRelation("atMostOne", type)
@@ -24,3 +23,10 @@ def many(type):
 
 def all(type):
     return _createRelation("boolean", type)
+
+def resource_type(properties):
+    for name in properties:
+        prop = properties[name]
+        prop["parentType"] = properties
+
+    return properties

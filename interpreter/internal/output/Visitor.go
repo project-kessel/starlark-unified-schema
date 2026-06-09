@@ -6,7 +6,7 @@ type Visitor interface {
 	VisitUnless(left any, right any) any
 	VisitRelationExpression(name string) any
 	VisitSubRelationExpression(name string, sub string) any
-	VisitAssignableExpression(typeNamespace string, typeName string, cardinality string, data_type any) any
+	VisitAssignableExpression(typeNamespace string, typeName string, cardinality string) any
 
 	BeginRelation(name string)
 	// Construct relation expression
@@ -14,5 +14,5 @@ type Visitor interface {
 
 	BeginType(namespace string, name string)
 	// Construct type expression
-	VisitType(namespace string, name string, relations []any, data_fields []any) any
+	VisitType(namespace string, name string, relations []any) any
 }

@@ -5,16 +5,26 @@ import (
 	"go.starlark.net/starlark"
 )
 
+type resourceType *starlark.Dict
+
 type Processor struct {
-	thread *starlark.Thread
-	loader *Loader
+	thread   *starlark.Thread
+	loader   *Loader
+	metadata map[resourceType]meta
 }
 
 func NewProcessor(loader *Loader) *Processor {
-	return &Processor{
-		loader: loader,
-		thread: &starlark.Thread{Name: "processor thread", Load: loader.Load},
+	m := map[resourceType]meta{}
+
+	p := &Processor{
+		loader:   loader,
+		thread:   &starlark.Thread{Name: "processor thread", Load: loader.Load},
+		metadata: m,
 	}
+
+	loader.SetMetadata(m)
+
+	return p
 }
 
 func (p *Processor) ProcessModule(name string, visitor output.Visitor) error {
@@ -43,4 +53,9 @@ func (p *Processor) ProcessAllModules(visitor output.Visitor) error {
 	}
 
 	return nil
+}
+
+type meta struct {
+	moduleName string
+	typeName   string
 }

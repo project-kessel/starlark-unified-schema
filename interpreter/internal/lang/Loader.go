@@ -17,6 +17,7 @@ type Loader struct {
 	predeclared  starlark.StringDict
 	reader       sourceFileReader
 	module_names []string
+	metadata     map[resourceType]meta
 }
 
 func NewLoader(path string) *Loader {
@@ -38,6 +39,10 @@ func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 	return l
 }
 
+func (l *Loader) SetMetadata(metadata map[resourceType]meta) {
+	l.metadata = metadata
+}
+
 func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict, error) {
 	if m, ok := l.modules[name]; ok {
 		return m, nil
@@ -54,9 +59,29 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 		return nil, err
 	}
 
+	moduleName := fileNameToModuleName(name)
+
+	l.recordNames(moduleName, globals)
+
 	l.modules[name] = globals
 
 	return globals, nil
+}
+
+func (l *Loader) recordNames(moduleName string, globals starlark.StringDict) {
+	for typeName, value := range globals {
+		if obj, ok := value.(*starlark.Dict); ok {
+			l.metadata[obj] = meta{
+				moduleName: moduleName,
+				typeName:   typeName,
+			}
+		}
+	}
+}
+
+func fileNameToModuleName(relativePath string) string {
+	filename := filepath.Base(relativePath)
+	return strings.TrimSuffix(filename, ".star")
 }
 
 func (l *Loader) GetAllModuleNames() ([]string, error) {
