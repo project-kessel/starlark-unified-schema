@@ -3,8 +3,9 @@ package lang
 import (
 	"testing"
 
-	"github.com/project-kessel/starlark-unified-schema/internal/util"
+	"github.com/project-kessel/starlark-unified-schema/internal/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const kesselStarContent = `
@@ -38,22 +39,11 @@ func setupProcessorWithKessel(t *testing.T, reader *InMemorySourceFileReader) *P
 	return NewProcessor(loader)
 }
 
-func processAndVisit(t *testing.T, processor *Processor) *util.SpyVisitor {
+func mustProcessAll(t *testing.T, processor *Processor) []model.Resource {
 	t.Helper()
-
 	resources, err := processor.ProcessAll()
-	if err != nil {
-		t.Fatalf("ProcessAll failed: %v", err)
-	}
-
-	spy := util.NewSpyVisitor()
-	for _, res := range resources {
-		if err := spy.VisitResource(res); err != nil {
-			t.Fatalf("VisitResource failed: %v", err)
-		}
-	}
-
-	return spy
+	require.NoError(t, err)
+	return resources
 }
 
 func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
@@ -77,16 +67,16 @@ host = resource("hbi", common, {
 })
 `))
 
-	spy := processAndVisit(t, processor)
+	resources := mustProcessAll(t, processor)
 
-	spy.AssertJSON(t, `{
-		"host": {
-			"common": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
-			"reporters": {
-				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]
-			}
-		}
-	}`)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "host", resources[0].Name)
+	assert.Equal(t, []model.Field{
+		{Name: "workspace_id", Required: true, Type: model.DataType{Kind: "text"}},
+	}, resources[0].Common)
+	assert.Equal(t, map[string][]model.Field{
+		"hbi": {{Name: "insights_id", Type: model.DataType{Kind: "uuid"}}},
+	}, resources[0].Reporters)
 }
 
 func TestProcessorCommonOnlyFileProducesNoResources(t *testing.T) {
@@ -101,9 +91,9 @@ host = {
 }
 `))
 
-	spy := processAndVisit(t, processor)
+	resources := mustProcessAll(t, processor)
 
-	spy.AssertJSON(t, `{}`)
+	assert.Empty(t, resources)
 }
 
 func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
@@ -128,9 +118,7 @@ host = resource("hbi", fields={
 
 	_, err := processor.ProcessAll()
 
-	if !assert.Error(t, err) {
-		return
-	}
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registered more than once")
 }
 
@@ -138,9 +126,9 @@ func TestProcessorSkipsLibraryModules(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	spy := processAndVisit(t, processor)
+	resources := mustProcessAll(t, processor)
 
-	spy.AssertJSON(t, `{}`)
+	assert.Empty(t, resources)
 }
 
 func TestProcessorMultipleReportersMerge(t *testing.T) {
@@ -173,15 +161,15 @@ host = resource("acm", common, {
 })
 `))
 
-	spy := processAndVisit(t, processor)
+	resources := mustProcessAll(t, processor)
 
-	spy.AssertJSON(t, `{
-		"host": {
-			"common": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
-			"reporters": {
-				"acm": [{"name": "cluster_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
-				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]
-			}
-		}
-	}`)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "host", resources[0].Name)
+	assert.Equal(t, []model.Field{
+		{Name: "workspace_id", Required: true, Type: model.DataType{Kind: "text"}},
+	}, resources[0].Common)
+	assert.Equal(t, map[string][]model.Field{
+		"hbi": {{Name: "insights_id", Type: model.DataType{Kind: "uuid"}}},
+		"acm": {{Name: "cluster_id", Required: true, Type: model.DataType{Kind: "text"}}},
+	}, resources[0].Reporters)
 }

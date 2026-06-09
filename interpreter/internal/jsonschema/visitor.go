@@ -15,19 +15,19 @@ func NewVisitor() *Visitor {
 	return &Visitor{}
 }
 
-func (v *Visitor) VisitResource(resource model.Resource) error {
-	commonSchema := v.buildFieldsSchema(resource.Common)
+func (v *Visitor) VisitResource(r *model.Resource, common []any, reporters map[string][]any) any {
+	commonSchema := buildObjectSchema(common)
 	commonSchema.SchemaURI = schemaURI
 	v.Outputs = append(v.Outputs, OutputEntry{
-		Path:   filepath.Join(resource.Name, "common_representation.json"),
+		Path:   filepath.Join(r.Name, "common_representation.json"),
 		Schema: commonSchema,
 	})
 
-	for reporterName, fields := range resource.Reporters {
-		reporterSchema := v.buildFieldsSchema(fields)
+	for reporterName, fields := range reporters {
+		reporterSchema := buildObjectSchema(fields)
 		reporterSchema.SchemaURI = schemaURI
 		v.Outputs = append(v.Outputs, OutputEntry{
-			Path:   filepath.Join(resource.Name, "reporters", reporterName, fmt.Sprintf("%s.json", resource.Name)),
+			Path:   filepath.Join(r.Name, "reporters", reporterName, fmt.Sprintf("%s.json", r.Name)),
 			Schema: reporterSchema,
 		})
 	}
@@ -35,40 +35,15 @@ func (v *Visitor) VisitResource(resource model.Resource) error {
 	return nil
 }
 
-func (v *Visitor) buildFieldsSchema(fields []model.Field) *Schema {
-	schema := &Schema{
-		Type:       "object",
-		Properties: map[string]*Schema{},
-	}
-
-	var required []string
-	for _, f := range fields {
-		schema.Properties[f.Name] = v.convertField(f)
-		if f.Required {
-			required = append(required, f.Name)
-		}
-	}
-
-	if len(required) > 0 {
-		r := append([]string(nil), required...)
-		schema.Required = &r
-	} else {
-		r := []string{}
-		schema.Required = &r
-	}
-
-	return schema
-}
-
-func (v *Visitor) convertField(f model.Field) *Schema {
-	schema := v.convertDataType(f.Type)
+func (v *Visitor) VisitField(f *model.Field, dataType any) any {
+	schema := dataType.(*Schema)
 	if f.Description != nil {
 		schema.Description = *f.Description
 	}
-	return schema
+	return &namedSchema{name: f.Name, schema: schema, required: f.Required}
 }
 
-func (v *Visitor) convertDataType(dt model.DataType) *Schema {
+func (v *Visitor) VisitDataType(dt *model.DataType, children []any) any {
 	switch dt.Kind {
 	case "text":
 		s := &Schema{Type: "string"}
@@ -98,29 +73,24 @@ func (v *Visitor) convertDataType(dt model.DataType) *Schema {
 		return &Schema{Type: "string", Enum: dt.Values}
 
 	case "nullable":
-		innerSchema := v.convertDataType(*dt.Inner)
-		if innerSchema.OneOf != nil {
-			schemas := make([]*Schema, len(innerSchema.OneOf)+1)
-			copy(schemas, innerSchema.OneOf)
+		inner := children[0].(*Schema)
+		if inner.OneOf != nil {
+			schemas := make([]*Schema, len(inner.OneOf)+1)
+			copy(schemas, inner.OneOf)
 			schemas[len(schemas)-1] = &Schema{Type: "null"}
 			return &Schema{OneOf: schemas}
 		}
-		return &Schema{
-			OneOf: []*Schema{innerSchema, {Type: "null"}},
-		}
+		return &Schema{OneOf: []*Schema{inner, {Type: "null"}}}
 
 	case "union":
-		schemas := make([]*Schema, len(dt.Members))
-		for i, m := range dt.Members {
-			schemas[i] = v.convertDataType(m)
+		schemas := make([]*Schema, len(children))
+		for i, c := range children {
+			schemas[i] = c.(*Schema)
 		}
 		return &Schema{OneOf: schemas}
 
 	case "array":
-		return &Schema{
-			Type:  "array",
-			Items: v.convertDataType(*dt.Items),
-		}
+		return &Schema{Type: "array", Items: children[0].(*Schema)}
 
 	case "object":
 		s := &Schema{
@@ -128,10 +98,11 @@ func (v *Visitor) convertDataType(dt model.DataType) *Schema {
 			Properties: map[string]*Schema{},
 		}
 		var required []string
-		for _, prop := range dt.Properties {
-			s.Properties[prop.Name] = v.convertDataType(prop.Type)
-			if prop.Required {
-				required = append(required, prop.Name)
+		for i, c := range children {
+			ns := c.(*namedSchema)
+			s.Properties[ns.name] = ns.schema
+			if dt.Properties[i].Required {
+				required = append(required, ns.name)
 			}
 		}
 		if len(dt.Required) > 0 {
@@ -145,6 +116,34 @@ func (v *Visitor) convertDataType(dt model.DataType) *Schema {
 	default:
 		return &Schema{}
 	}
+}
+
+func buildObjectSchema(fields []any) *Schema {
+	schema := &Schema{
+		Type:       "object",
+		Properties: map[string]*Schema{},
+	}
+
+	var required []string
+	for _, f := range fields {
+		ns := f.(*namedSchema)
+		schema.Properties[ns.name] = ns.schema
+		if ns.required {
+			required = append(required, ns.name)
+		}
+	}
+
+	if len(required) > 0 {
+		schema.Required = &required
+	}
+
+	return schema
+}
+
+type namedSchema struct {
+	name     string
+	schema   *Schema
+	required bool
 }
 
 func intPtrToFloatPtr(v *int) *float64 {

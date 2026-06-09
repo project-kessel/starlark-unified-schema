@@ -1,5 +1,7 @@
 package model
 
 type SchemaVisitor interface {
-	VisitResource(resource Resource) error
+	VisitResource(r *Resource, common []any, reporters map[string][]any) any
+	VisitField(f *Field, dataType any) any
+	VisitDataType(dt *DataType, children []any) any
 }
