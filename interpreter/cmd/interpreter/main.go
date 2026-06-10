@@ -14,8 +14,9 @@ func main() {
 	outputDir := flag.String("output-dir", "output", "directory to write generated artifacts")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Processes Starlark schema files and generates JSON Schema artifacts.\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] [file ...]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Processes Starlark schema files and generates JSON Schema artifacts.\n")
+		fmt.Fprintf(os.Stderr, "If no files are specified, all .star files under -src are processed.\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 	}
@@ -26,7 +27,7 @@ func main() {
 	processor := lang.NewProcessor(loader)
 
 	jsonSchemaVisitor := output.NewJSONSchemaVisitor()
-	if err := processor.Process(jsonSchemaVisitor); err != nil {
+	if err := processor.Process(jsonSchemaVisitor, flag.Args()...); err != nil {
 		fmt.Fprintf(os.Stderr, "Error processing schema: %v\n", err)
 		os.Exit(1)
 	}

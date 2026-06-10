@@ -20,10 +20,14 @@ func NewProcessor(loader *Loader) *Processor {
 	}
 }
 
-func (p *Processor) Process(visitor output.SchemaVisitor) error {
-	names, err := p.loader.GetAllModuleNames()
-	if err != nil {
-		return err
+func (p *Processor) Process(visitor output.SchemaVisitor, files ...string) error {
+	names := files
+	if len(names) == 0 {
+		var err error
+		names, err = p.loader.GetAllModuleNames()
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, name := range names {
