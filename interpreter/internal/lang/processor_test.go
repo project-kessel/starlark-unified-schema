@@ -182,3 +182,48 @@ host = resource("acm", common, {
 		}
 	}`)
 }
+
+func TestProcessorProcessesDependencyModuleAfterLoadCaching(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("host/reporters/rbac/host.star", []byte(`
+load("kessel.star", "resource", "field", "text")
+
+host = resource("rbac", fields={
+    "role": field(type=text(), required=True),
+})
+`))
+
+	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+load("kessel.star", "resource", "field", "uuid")
+load("host/reporters/rbac/host.star", rbac_host="host")
+
+host = resource("hbi", fields={
+    "insights_id": field(type=uuid()),
+})
+`))
+
+	if err := processor.ProcessModule("host/reporters/hbi/host.star"); err != nil {
+		t.Fatalf("ProcessModule for hbi failed: %v", err)
+	}
+
+	if err := processor.ProcessModule("host/reporters/rbac/host.star"); err != nil {
+		t.Fatalf("ProcessModule for rbac failed: %v", err)
+	}
+
+	spy := util.NewSpyVisitor()
+	if err := processor.Visit(spy); err != nil {
+		t.Fatalf("Visit failed: %v", err)
+	}
+
+	spy.AssertJSON(t, `{
+		"host": {
+			"common": null,
+			"reporters": {
+				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}],
+				"rbac": [{"name": "role", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}]
+			}
+		}
+	}`)
+}

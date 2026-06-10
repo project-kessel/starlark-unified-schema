@@ -30,15 +30,9 @@ func NewProcessor(loader *Loader) *Processor {
 }
 
 func (p *Processor) ProcessModule(name string) error {
-	alreadyLoaded := p.loader.IsLoaded(name)
-
 	globals, err := p.loader.Load(p.thread, name)
 	if err != nil {
 		return err
-	}
-
-	if alreadyLoaded {
-		return nil
 	}
 
 	for varName, value := range globals {

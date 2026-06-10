@@ -11,11 +11,11 @@ import (
 )
 
 type Loader struct {
-	path         string
-	modules      map[string]starlark.StringDict
-	opts         *syntax.FileOptions
-	predeclared  starlark.StringDict
-	reader       sourceFileReader
+	path        string
+	modules     map[string]starlark.StringDict
+	opts        *syntax.FileOptions
+	predeclared starlark.StringDict
+	reader      sourceFileReader
 	moduleNames []string
 }
 
@@ -25,22 +25,17 @@ func NewLoader(path string) *Loader {
 
 func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 	l := &Loader{
-		path:         path,
-		modules:      map[string]starlark.StringDict{},
-		opts:         &syntax.FileOptions{},
-		predeclared:  starlark.StringDict{},
+		path:        path,
+		modules:     map[string]starlark.StringDict{},
+		opts:        &syntax.FileOptions{},
+		predeclared: starlark.StringDict{},
 		moduleNames: nil,
-		reader:       reader,
+		reader:      reader,
 	}
 
 	registerDefaultBuiltins(l)
 
 	return l
-}
-
-func (l *Loader) IsLoaded(name string) bool {
-	_, ok := l.modules[name]
-	return ok
 }
 
 func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict, error) {
