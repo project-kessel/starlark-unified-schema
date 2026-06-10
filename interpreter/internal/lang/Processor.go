@@ -2,9 +2,11 @@ package lang
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
 	"go.starlark.net/starlark"
+	"go.starlark.net/starlarkstruct"
 )
 
 type resourceType *starlark.Dict
@@ -35,31 +37,45 @@ func (p *Processor) ProcessModule(name string, visitor output.Visitor) error {
 		return err
 	}
 
-	// Iterate through module globals
+	// Collect type dicts and sort by name for deterministic output
+	type typeEntry struct {
+		name     string
+		typeDict *starlark.Dict
+	}
+
+	var types []typeEntry
 	for globalName, globalValue := range globals {
-		// Check if this global is a type (Dict)
 		if typeDict, ok := globalValue.(*starlark.Dict); ok {
-			// Get metadata for this type
 			metadata, exists := p.metadata[typeDict]
 			if !exists {
 				return fmt.Errorf("no metadata found for type %s", globalName)
 			}
-
-			namespace := metadata.moduleName
-			typeName := metadata.typeName
-
-			// Begin type processing
-			visitor.BeginType(namespace, typeName)
-
-			// Process relations
-			relations, err := p.processTypeRelations(typeDict, namespace, typeName, visitor)
-			if err != nil {
-				return fmt.Errorf("failed to process relations for type %s: %w", typeName, err)
-			}
-
-			// Visit the type
-			visitor.VisitType(namespace, typeName, relations)
+			types = append(types, typeEntry{name: metadata.typeName, typeDict: typeDict})
 		}
+	}
+
+	// Sort types alphabetically by name
+	sort.Slice(types, func(i, j int) bool {
+		return types[i].name < types[j].name
+	})
+
+	// Process types in sorted order
+	for _, entry := range types {
+		metadata := p.metadata[entry.typeDict]
+		namespace := metadata.moduleName
+		typeName := metadata.typeName
+
+		// Begin type processing
+		visitor.BeginType(namespace, typeName)
+
+		// Process relations
+		relations, err := p.processTypeRelations(entry.typeDict, namespace, typeName, visitor)
+		if err != nil {
+			return fmt.Errorf("failed to process relations for type %s: %w", typeName, err)
+		}
+
+		// Visit the type
+		visitor.VisitType(namespace, typeName, relations)
 	}
 
 	return nil
@@ -103,27 +119,42 @@ func mapCardinality(kind string) string {
 	}
 }
 
-func (p *Processor) processCardinalityRelation(relationDict *starlark.Dict, kind string, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
-	// Get the "type" field
-	typeValue, found, err := relationDict.Get(starlark.String("type"))
-	if !found || err != nil {
+func getAttr(value starlark.Value, attrName string) (starlark.Value, bool, error) {
+	if dict, ok := value.(*starlark.Dict); ok {
+		val, found, err := dict.Get(starlark.String(attrName))
+		return val, found, err
+	} else if strct, ok := value.(*starlarkstruct.Struct); ok {
+		val, err := strct.Attr(attrName)
+		if err != nil {
+			return starlark.None, false, nil
+		}
+		return val, true, nil
+	}
+	return nil, false, fmt.Errorf("value is not a dict or struct, got: %T", value)
+}
+
+func (p *Processor) processCardinalityRelation(relationValue starlark.Value, kind string, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
+	typeValue, found, err := getAttr(relationValue, "type")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
 		return nil, fmt.Errorf("cardinality relation missing 'type' field")
 	}
 
-	// Check if type is a Dict (reference to another type)
-	if typeDict, ok := typeValue.(*starlark.Dict); ok {
-		// Check if it's a selfType
-		selfKindValue, found, _ := typeDict.Get(starlark.String("kind"))
-		if found {
-			selfKind, _ := convert_to_string(selfKindValue)
-			if selfKind == "selfType" {
-				// Self-reference: use parent type
-				cardinality := mapCardinality(kind)
-				return visitor.VisitAssignableExpression(parentNamespace, parentTypeName, cardinality), nil
-			}
+	// Check if it's a selfType
+	selfKindValue, found, _ := getAttr(typeValue, "kind")
+	if found {
+		selfKind, _ := convert_to_string(selfKindValue)
+		if selfKind == "selfType" {
+			cardinality := mapCardinality(kind)
+			return visitor.VisitAssignableExpression(parentNamespace, parentTypeName, cardinality), nil
 		}
+	}
 
-		// Look up metadata for this type dict
+	// For now, assume it's a reference to another type via metadata
+	// This will need enhancement for more complex type references
+	if typeDict, ok := typeValue.(*starlark.Dict); ok {
 		metadata, exists := p.metadata[typeDict]
 		if !exists {
 			return nil, fmt.Errorf("no metadata found for referenced type dict")
@@ -131,28 +162,129 @@ func (p *Processor) processCardinalityRelation(relationDict *starlark.Dict, kind
 
 		namespace := metadata.moduleName
 		typeName := metadata.typeName
-
-		// Map kind to cardinality string
 		cardinality := mapCardinality(kind)
 
-		// Call visitor
 		return visitor.VisitAssignableExpression(namespace, typeName, cardinality), nil
 	}
 
-	return nil, fmt.Errorf("type field is not a dict, got: %T", typeValue)
+	return nil, fmt.Errorf("type field has unsupported structure: %T", typeValue)
+}
+
+func (p *Processor) processRefExpression(refValue starlark.Value, visitor output.Visitor) (any, error) {
+	nameValue, found, err := getAttr(refValue, "name")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("ref expression missing 'name' field")
+	}
+
+	name, err := convert_to_string(nameValue)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ref name to string: %w", err)
+	}
+
+	return visitor.VisitRelationExpression(name), nil
+}
+
+func (p *Processor) processOrExpression(orValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
+	leftValue, found, err := getAttr(orValue, "left")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("or expression missing 'left' field")
+	}
+
+	left, err := p.processRelationValue(leftValue, parentNamespace, parentTypeName, visitor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process or left operand: %w", err)
+	}
+
+	rightValue, found, err := getAttr(orValue, "right")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("or expression missing 'right' field")
+	}
+
+	right, err := p.processRelationValue(rightValue, parentNamespace, parentTypeName, visitor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process or right operand: %w", err)
+	}
+
+	return visitor.VisitOr(left, right), nil
+}
+
+func (p *Processor) processAndExpression(andValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
+	leftValue, found, err := getAttr(andValue, "left")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("and expression missing 'left' field")
+	}
+
+	left, err := p.processRelationValue(leftValue, parentNamespace, parentTypeName, visitor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process and left operand: %w", err)
+	}
+
+	rightValue, found, err := getAttr(andValue, "right")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("and expression missing 'right' field")
+	}
+
+	right, err := p.processRelationValue(rightValue, parentNamespace, parentTypeName, visitor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process and right operand: %w", err)
+	}
+
+	return visitor.VisitAnd(left, right), nil
+}
+
+func (p *Processor) processUnlessExpression(unlessValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
+	leftValue, found, err := getAttr(unlessValue, "left")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("unless expression missing 'left' field")
+	}
+
+	left, err := p.processRelationValue(leftValue, parentNamespace, parentTypeName, visitor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process unless left operand: %w", err)
+	}
+
+	rightValue, found, err := getAttr(unlessValue, "right")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("unless expression missing 'right' field")
+	}
+
+	right, err := p.processRelationValue(rightValue, parentNamespace, parentTypeName, visitor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process unless right operand: %w", err)
+	}
+
+	return visitor.VisitUnless(left, right), nil
 }
 
 func (p *Processor) processRelationValue(value starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
-	// Relation values are dicts with "kind" and "type" fields
-	valueDict, ok := value.(*starlark.Dict)
-	if !ok {
-		return nil, fmt.Errorf("relation value is not a dict, got: %T", value)
+	// Get kind first
+	kindValue, found, err := getAttr(value, "kind")
+	if err != nil {
+		return nil, err
 	}
-
-	// Get the "kind" field
-	kindValue, found, err := valueDict.Get(starlark.String("kind"))
-	if !found || err != nil {
-		return nil, fmt.Errorf("relation dict missing 'kind' field")
+	if !found {
+		return nil, fmt.Errorf("relation value missing 'kind' field")
 	}
 
 	kind, err := convert_to_string(kindValue)
@@ -163,11 +295,18 @@ func (p *Processor) processRelationValue(value starlark.Value, parentNamespace, 
 	// Handle based on kind
 	switch kind {
 	case "atMostOne", "exactlyOne", "atLeastOne", "many", "boolean":
-		return p.processCardinalityRelation(valueDict, kind, parentNamespace, parentTypeName, visitor)
+		return p.processCardinalityRelation(value, kind, parentNamespace, parentTypeName, visitor)
 	case "selfType":
-		// Self-type: use parent type's namespace and name
 		cardinality := mapCardinality(kind)
 		return visitor.VisitAssignableExpression(parentNamespace, parentTypeName, cardinality), nil
+	case "ref":
+		return p.processRefExpression(value, visitor)
+	case "or":
+		return p.processOrExpression(value, parentNamespace, parentTypeName, visitor)
+	case "and":
+		return p.processAndExpression(value, parentNamespace, parentTypeName, visitor)
+	case "unless":
+		return p.processUnlessExpression(value, parentNamespace, parentTypeName, visitor)
 	default:
 		return nil, fmt.Errorf("unknown relation kind: %s", kind)
 	}
@@ -178,7 +317,7 @@ func (p *Processor) processTypeRelations(typeDict *starlark.Dict, parentNamespac
 
 	// Iterate through dict items
 	for _, item := range typeDict.Items() {
-		relationName := item[0] // Key (starlark.String)
+		relationName := item[0]  // Key (starlark.String)
 		relationValue := item[1] // Value (starlark.Dict)
 
 		// Convert relation name to string

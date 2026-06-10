@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTemp(t *testing.T) {
+func TestAssignableResourceReference(t *testing.T) {
 	assertSourceMatchesGolden(t,
 		`
 load("kessel.star", "atMostOne", "resource_type")
@@ -39,6 +39,234 @@ resource = resource_type({
 			"typeNamespace":"test",
 			"typeName":"other",
 			"cardinality":"AtMostOne"
+		}
+	}]
+}]`)
+}
+
+func TestAssignableSelfReference(t *testing.T) {
+	assertSourceMatchesGolden(t,
+		`
+load("kessel.star", "atMostOne", "self", "resource_type")
+
+resource = resource_type({
+	"parent": atMostOne(self())
+	})
+`,
+		`
+[{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":[{
+		"kind":"relation",
+		"name":"parent",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"AtMostOne"
+		}
+	}]
+}]`)
+}
+
+func TestPassthroughPermission(t *testing.T) {
+	assertSourceMatchesGolden(t,
+		`
+load("kessel.star", "self", "boolean", "permissions", "resource_type")
+resource = resource_type({
+	"relation": boolean(self())
+})
+
+permissions(resource, {
+	"permission": lambda r: r.relation
+})
+`,
+		`
+[{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":[{
+		"kind":"relation",
+		"name":"relation",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"Boolean"
+		}
+	},
+	{
+		"kind": "relation",
+		"name": "permission",
+		"body": {
+			"kind":"ref",
+			"name": "relation"
+		}
+	}]
+}]`)
+}
+
+func TestPermissionWithBinaryLogic(t *testing.T) {
+	assertSourceMatchesGolden(t,
+		`
+load("kessel.star", "self", "boolean", "permissions", "resource_type")
+resource = resource_type({
+	"left": boolean(self()),
+	"right": boolean(self())
+})
+
+permissions(resource, {
+	"permission": lambda r: r.left.union(r.right)
+})
+`,
+		`
+[{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":[{
+		"kind":"relation",
+		"name":"left",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"Boolean"
+		}
+	},
+	{
+		"kind":"relation",
+		"name":"right",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"Boolean"
+		}
+	},
+	{
+		"kind": "relation",
+		"name": "permission",
+		"body": {
+			"kind":"or",
+			"left": {
+				"kind":"ref",
+				"name": "left"
+			},
+			"right": {
+				"kind":"ref",
+				"name": "right"
+			}
+		}
+	}]
+}]`)
+}
+
+func TestSubRefPermission(t *testing.T) {
+	assertSourceMatchesGolden(t,
+		`
+load("kessel.star", "self", "boolean", "permissions", "resource_type")
+resource = resource_type({
+	"parent": atMostOne(self())
+	"flag": boolean(self())
+})
+
+permissions(resource, {
+	"permission": lambda r: r.parent.flag
+})
+`,
+		`
+[{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":[{
+		"kind":"relation",
+		"name":"flag",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"Boolean"
+		}
+	},
+	{
+		"kind":"relation",
+		"name":"parent",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"AtMostOne"
+		}
+	},
+	{
+		"kind": "relation",
+		"name": "permission",
+		"body": {
+			"kind":"subref",
+			"name": "parent",
+			"sub": "flag"
+		}
+	}]
+}]`)
+}
+
+func TestRecursivePermission(t *testing.T) {
+	assertSourceMatchesGolden(t,
+		`
+load("kessel.star", "self", "boolean", "permissions", "resource_type")
+resource = resource_type({
+	"parent": atMostOne(self())
+	"flag": boolean(self())
+})
+
+permissions(resource, {
+	"permission": lambda r: r.flag.or(r.parent.permission)
+})
+`,
+		`
+[{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":[{
+		"kind":"relation",
+		"name":"flag",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"Boolean"
+		}
+	},
+	{
+		"kind":"relation",
+		"name":"parent",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"AtMostOne"
+		}
+	},
+	{
+		"kind": "relation",
+		"name": "permission",
+		"body": {
+			"kind":"or",
+			"left": {
+				"kind":"ref",
+				"name": "flag",
+			},
+			"right": {
+				"kind":"subref",
+				"name": "parent",
+				"sub": "permission"
+			}
 		}
 	}]
 }]`)
