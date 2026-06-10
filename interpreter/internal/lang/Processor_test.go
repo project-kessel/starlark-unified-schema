@@ -89,6 +89,14 @@ permissions(resource, {
 	"namespace":"test", 
 	"name":"resource", 
 	"relations":[{
+		"kind": "relation",
+		"name": "permission",
+		"body": {
+			"kind":"ref",
+			"name": "relation"
+		}
+	},
+	{
 		"kind":"relation",
 		"name":"relation",
 		"body": {
@@ -96,14 +104,6 @@ permissions(resource, {
 			"typeNamespace":"test",
 			"typeName":"resource",
 			"cardinality":"Boolean"
-		}
-	},
-	{
-		"kind": "relation",
-		"name": "permission",
-		"body": {
-			"kind":"ref",
-			"name": "relation"
 		}
 	}]
 }]`)
@@ -138,16 +138,6 @@ permissions(resource, {
 		}
 	},
 	{
-		"kind":"relation",
-		"name":"right",
-		"body": {
-			"kind":"assignable",
-			"typeNamespace":"test",
-			"typeName":"resource",
-			"cardinality":"Boolean"
-		}
-	},
-	{
 		"kind": "relation",
 		"name": "permission",
 		"body": {
@@ -161,6 +151,16 @@ permissions(resource, {
 				"name": "right"
 			}
 		}
+	},
+	{
+		"kind":"relation",
+		"name":"right",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"resource",
+			"cardinality":"Boolean"
+		}
 	}]
 }]`)
 }
@@ -168,9 +168,9 @@ permissions(resource, {
 func TestSubRefPermission(t *testing.T) {
 	assertSourceMatchesGolden(t,
 		`
-load("kessel.star", "self", "boolean", "permissions", "resource_type")
+load("kessel.star", "self", "boolean", "permissions", "resource_type", "atMostOne")
 resource = resource_type({
-	"parent": atMostOne(self())
+	"parent": atMostOne(self()),
 	"flag": boolean(self())
 })
 
@@ -218,14 +218,14 @@ permissions(resource, {
 func TestRecursivePermission(t *testing.T) {
 	assertSourceMatchesGolden(t,
 		`
-load("kessel.star", "self", "boolean", "permissions", "resource_type")
+load("kessel.star", "self", "boolean", "permissions", "resource_type", "atMostOne")
 resource = resource_type({
-	"parent": atMostOne(self())
+	"parent": atMostOne(self()),
 	"flag": boolean(self())
 })
 
 permissions(resource, {
-	"permission": lambda r: r.flag.or(r.parent.permission)
+	"permission": lambda r: r.flag.union(r.parent.permission)
 })
 `,
 		`

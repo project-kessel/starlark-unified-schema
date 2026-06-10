@@ -187,6 +187,36 @@ func (p *Processor) processRefExpression(refValue starlark.Value, visitor output
 	return visitor.VisitRelationExpression(name), nil
 }
 
+func (p *Processor) processSubrefExpression(subrefValue starlark.Value, visitor output.Visitor) (any, error) {
+	nameValue, found, err := getAttr(subrefValue, "name")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("subref expression missing 'name' field")
+	}
+
+	name, err := convert_to_string(nameValue)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert subref name to string: %w", err)
+	}
+
+	subValue, found, err := getAttr(subrefValue, "sub")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("subref expression missing 'sub' field")
+	}
+
+	sub, err := convert_to_string(subValue)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert subref sub to string: %w", err)
+	}
+
+	return visitor.VisitSubRelationExpression(name, sub), nil
+}
+
 func (p *Processor) processOrExpression(orValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
 	leftValue, found, err := getAttr(orValue, "left")
 	if err != nil {
@@ -301,6 +331,8 @@ func (p *Processor) processRelationValue(value starlark.Value, parentNamespace, 
 		return visitor.VisitAssignableExpression(parentNamespace, parentTypeName, cardinality), nil
 	case "ref":
 		return p.processRefExpression(value, visitor)
+	case "subref":
+		return p.processSubrefExpression(value, visitor)
 	case "or":
 		return p.processOrExpression(value, parentNamespace, parentTypeName, visitor)
 	case "and":
@@ -315,8 +347,16 @@ func (p *Processor) processRelationValue(value starlark.Value, parentNamespace, 
 func (p *Processor) processTypeRelations(typeDict *starlark.Dict, parentNamespace, parentTypeName string, visitor output.Visitor) ([]any, error) {
 	relations := make([]any, 0)
 
-	// Iterate through dict items
-	for _, item := range typeDict.Items() {
+	// Get dict items and sort by name for deterministic output
+	items := typeDict.Items()
+	sort.Slice(items, func(i, j int) bool {
+		nameI, _ := convert_to_string(items[i][0])
+		nameJ, _ := convert_to_string(items[j][0])
+		return nameI < nameJ
+	})
+
+	// Iterate through sorted dict items
+	for _, item := range items {
 		relationName := item[0]  // Key (starlark.String)
 		relationValue := item[1] // Value (starlark.Dict)
 
