@@ -7,7 +7,7 @@ import (
 	"go.starlark.net/starlarkstruct"
 )
 
-func convertToString(v starlark.Value) (string, error) {
+func convert_to_string(v starlark.Value) (string, error) {
 	if s, ok := v.(starlark.String); ok {
 		return string(s), nil
 	} else {
@@ -15,7 +15,7 @@ func convertToString(v starlark.Value) (string, error) {
 	}
 }
 
-func convertToCallable(v starlark.Value) (starlark.Callable, error) {
+func convert_to_callable(v starlark.Value) (starlark.Callable, error) {
 	if c, ok := v.(starlark.Callable); ok {
 		return c, nil
 	} else {
@@ -23,7 +23,7 @@ func convertToCallable(v starlark.Value) (starlark.Callable, error) {
 	}
 }
 
-func getBool(name string, structure *starlarkstruct.Struct) (bool, error) {
+func get_bool(name string, structure *starlarkstruct.Struct) (bool, error) {
 	v, err := structure.Attr(name)
 	if err != nil {
 		return false, fmt.Errorf("error access member %s of struct %+v: %w", name, structure, err)
@@ -36,16 +36,16 @@ func getBool(name string, structure *starlarkstruct.Struct) (bool, error) {
 	}
 }
 
-func getString(name string, structure *starlarkstruct.Struct) (string, error) {
+func get_string(name string, structure *starlarkstruct.Struct) (string, error) {
 	v, err := structure.Attr(name)
 	if err != nil {
 		return "", fmt.Errorf("error accessing member %s of struct %+v: %w", name, structure, err)
 	}
 
-	return convertToString(v)
+	return convert_to_string(v)
 }
 
-func getOptionalString(name string, structure *starlarkstruct.Struct) (*string, error) {
+func get_optional_string(name string, structure *starlarkstruct.Struct) (*string, error) {
 	v, err := structure.Attr(name)
 	if err != nil {
 		return nil, fmt.Errorf("error accessing member %s of struct %+v: %w", name, structure, err)
@@ -55,7 +55,7 @@ func getOptionalString(name string, structure *starlarkstruct.Struct) (*string, 
 		return nil, nil
 	}
 
-	s, err := convertToString(v)
+	s, err := convert_to_string(v)
 	if err != nil {
 		return nil, err
 	}
