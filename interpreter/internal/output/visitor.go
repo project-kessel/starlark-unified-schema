@@ -2,7 +2,7 @@ package output
 
 type SchemaVisitor interface {
 	BeginType(name string)
-	VisitType(name string, commonFields []any, reporterGroups map[string][]any) any
+	VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any) error
 
 	VisitDataField(name string, required bool, description *string, dataType any) any
 

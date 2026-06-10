@@ -1,16 +1,19 @@
 package util
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestSpyVisitorCapturesResource(t *testing.T) {
 	spy := NewSpyVisitor()
 
 	spy.BeginType("host")
 	common := []any{spy.VisitDataField("workspace_id", true, nil, spy.VisitTextDataType(nil, nil, nil))}
-	reporters := map[string][]any{
-		"hbi": {spy.VisitDataField("insights_id", false, nil, spy.VisitUUIDDataType())},
-	}
-	spy.VisitType("host", common, reporters)
+	hbiFields := []any{spy.VisitDataField("insights_id", false, nil, spy.VisitUUIDDataType())}
+	err := spy.VisitResource("host", "hbi", common, hbiFields)
+	assert.NoError(t, err)
 
 	spy.AssertJSON(t, `{
 		"host": {

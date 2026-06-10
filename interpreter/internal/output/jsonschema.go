@@ -3,74 +3,103 @@ package output
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 )
 
 const schemaURI = "http://json-schema.org/draft-07/schema#"
 
-type Schema struct {
-	SchemaURI   string             `json:"$schema,omitempty"`
-	Type        string             `json:"type,omitempty"`
-	Format      string             `json:"format,omitempty"`
-	Properties  map[string]*Schema `json:"properties,omitempty"`
-	Required    *[]string          `json:"required,omitempty"`
-	Items       *Schema            `json:"items,omitempty"`
-	OneOf       []*Schema          `json:"oneOf,omitempty"`
-	Enum        []string           `json:"enum,omitempty"`
-	Description string             `json:"description,omitempty"`
-	Pattern     string             `json:"pattern,omitempty"`
-	MinLength   *int               `json:"minLength,omitempty"`
-	MaxLength   *int               `json:"maxLength,omitempty"`
-	Minimum     *float64           `json:"minimum,omitempty"`
-	Maximum     *float64           `json:"maximum,omitempty"`
-}
+type node = map[string]any
 
 type OutputEntry struct {
 	Path   string
-	Schema *Schema
+	Schema any
 }
 
 type JSONSchemaVisitor struct {
-	Outputs []OutputEntry
+	root node
 }
 
 func NewJSONSchemaVisitor() *JSONSchemaVisitor {
-	return &JSONSchemaVisitor{}
+	return &JSONSchemaVisitor{root: make(node)}
 }
 
 func (v *JSONSchemaVisitor) BeginType(name string) {}
 
-func (v *JSONSchemaVisitor) VisitType(name string, commonFields []any, reporterGroups map[string][]any) any {
-	commonSchema := v.buildObjectSchema(commonFields, nil)
-	commonSchema.SchemaURI = schemaURI
-	v.Outputs = append(v.Outputs, OutputEntry{
-		Path:   filepath.Join(name, "common_representation.json"),
-		Schema: commonSchema,
-	})
-
-	for reporterName, fields := range reporterGroups {
-		reporterSchema := v.buildObjectSchema(fields, nil)
-		reporterSchema.SchemaURI = schemaURI
-		v.Outputs = append(v.Outputs, OutputEntry{
-			Path:   filepath.Join(name, "reporters", reporterName, fmt.Sprintf("%s.json", name)),
-			Schema: reporterSchema,
-		})
+func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any) error {
+	entry, exists := v.root[typeName].(node)
+	if !exists {
+		entry = node{"common": nil, "reporters": node{}}
+		v.root[typeName] = entry
 	}
-
+	if commonFields != nil && entry["common"] == nil {
+		entry["common"] = commonFields
+	}
+	if reporter != "" {
+		reporters := entry["reporters"].(node)
+		if _, dup := reporters[reporter]; dup {
+			return fmt.Errorf("resource %s: reporter '%s' registered more than once", typeName, reporter)
+		}
+		reporters[reporter] = reporterFields
+	}
 	return nil
 }
 
-func (v *JSONSchemaVisitor) buildObjectSchema(fields []any, explicitRequired []string) *Schema {
-	schema := &Schema{
-		Type:       "object",
-		Properties: map[string]*Schema{},
+func (v *JSONSchemaVisitor) Results() []OutputEntry {
+	var entries []OutputEntry
+
+	typeNames := make([]string, 0, len(v.root))
+	for name := range v.root {
+		typeNames = append(typeNames, name)
+	}
+	sort.Strings(typeNames)
+
+	for _, typeName := range typeNames {
+		entry := v.root[typeName].(node)
+
+		var commonFields []any
+		if cf, ok := entry["common"].([]any); ok {
+			commonFields = cf
+		}
+		commonSchema := buildObjectSchema(commonFields, nil)
+		commonSchema["$schema"] = schemaURI
+		entries = append(entries, OutputEntry{
+			Path:   filepath.Join(typeName, "common_representation.json"),
+			Schema: commonSchema,
+		})
+
+		reporters := entry["reporters"].(node)
+		reporterNames := make([]string, 0, len(reporters))
+		for name := range reporters {
+			reporterNames = append(reporterNames, name)
+		}
+		sort.Strings(reporterNames)
+
+		for _, reporterName := range reporterNames {
+			var reporterFields []any
+			if rf, ok := reporters[reporterName].([]any); ok {
+				reporterFields = rf
+			}
+			reporterSchema := buildObjectSchema(reporterFields, nil)
+			reporterSchema["$schema"] = schemaURI
+			entries = append(entries, OutputEntry{
+				Path:   filepath.Join(typeName, "reporters", reporterName, fmt.Sprintf("%s.json", typeName)),
+				Schema: reporterSchema,
+			})
+		}
 	}
 
+	return entries
+}
+
+func buildObjectSchema(fields []any, explicitRequired []string) node {
+	properties := node{}
 	var derived []string
 	for _, f := range fields {
-		ns := f.(*namedSchema)
-		schema.Properties[ns.name] = ns.schema
-		if ns.required {
-			derived = append(derived, ns.name)
+		fn := f.(node)
+		name := fn["name"].(string)
+		properties[name] = fn["schema"]
+		if fn["required"].(bool) {
+			derived = append(derived, name)
 		}
 	}
 
@@ -78,103 +107,79 @@ func (v *JSONSchemaVisitor) buildObjectSchema(fields []any, explicitRequired []s
 	if required == nil {
 		required = derived
 	}
-
-	if len(required) > 0 {
-		r := append([]string(nil), required...)
-		schema.Required = &r
-	} else {
-		r := []string{}
-		schema.Required = &r
+	if required == nil {
+		required = []string{}
 	}
 
-	return schema
+	return node{"type": "object", "properties": properties, "required": required}
 }
 
 func (v *JSONSchemaVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {
-	schema := dataType.(*Schema)
+	n := dataType.(node)
 	if description != nil {
-		schema.Description = *description
+		n["description"] = *description
 	}
-	return &namedSchema{name: name, schema: schema, required: required}
+	return node{"name": name, "schema": n, "required": required}
 }
 
 func (v *JSONSchemaVisitor) VisitTextDataType(minLength *int, maxLength *int, regex *string) any {
-	s := &Schema{Type: "string"}
-	s.MinLength = minLength
-	s.MaxLength = maxLength
-	if regex != nil {
-		s.Pattern = *regex
+	n := node{"type": "string"}
+	if minLength != nil {
+		n["minLength"] = *minLength
 	}
-	return s
+	if maxLength != nil {
+		n["maxLength"] = *maxLength
+	}
+	if regex != nil {
+		n["pattern"] = *regex
+	}
+	return n
 }
 
 func (v *JSONSchemaVisitor) VisitUUIDDataType() any {
-	return &Schema{Type: "string", Format: "uuid"}
+	return node{"type": "string", "format": "uuid"}
 }
 
 func (v *JSONSchemaVisitor) VisitNumericIDDataType(min *int, max *int) any {
-	s := &Schema{Type: "integer"}
-	s.Minimum = intPtrToFloatPtr(min)
-	s.Maximum = intPtrToFloatPtr(max)
-	return s
+	n := node{"type": "integer"}
+	if min != nil {
+		n["minimum"] = float64(*min)
+	}
+	if max != nil {
+		n["maximum"] = float64(*max)
+	}
+	return n
 }
 
 func (v *JSONSchemaVisitor) VisitBooleanDataType() any {
-	return &Schema{Type: "boolean"}
+	return node{"type": "boolean"}
 }
 
 func (v *JSONSchemaVisitor) VisitDateTimeDataType() any {
-	return &Schema{Type: "string", Format: "date-time"}
+	return node{"type": "string", "format": "date-time"}
 }
 
 func (v *JSONSchemaVisitor) VisitEnumDataType(values []string) any {
-	return &Schema{Type: "string", Enum: values}
+	return node{"type": "string", "enum": values}
 }
 
 func (v *JSONSchemaVisitor) VisitNullableDataType(inner any) any {
-	innerSchema := inner.(*Schema)
-
-	if innerSchema.OneOf != nil {
-		schemas := make([]*Schema, len(innerSchema.OneOf)+1)
-		copy(schemas, innerSchema.OneOf)
-		schemas[len(schemas)-1] = &Schema{Type: "null"}
-		return &Schema{OneOf: schemas}
+	innerNode := inner.(node)
+	if oneOf, ok := innerNode["oneOf"]; ok {
+		schemas := append(oneOf.([]any), node{"type": "null"})
+		return node{"oneOf": schemas}
 	}
-
-	return &Schema{
-		OneOf: []*Schema{innerSchema, {Type: "null"}},
-	}
+	return node{"oneOf": []any{innerNode, node{"type": "null"}}}
 }
 
 func (v *JSONSchemaVisitor) VisitCompositeDataType(dataTypes []any) any {
-	schemas := make([]*Schema, len(dataTypes))
-	for i, dt := range dataTypes {
-		schemas[i] = dt.(*Schema)
-	}
-	return &Schema{OneOf: schemas}
+	return node{"oneOf": dataTypes}
 }
 
 func (v *JSONSchemaVisitor) VisitArrayDataType(items any) any {
-	return &Schema{
-		Type:  "array",
-		Items: items.(*Schema),
-	}
+	return node{"type": "array", "items": items}
 }
 
 func (v *JSONSchemaVisitor) VisitObjectDataType(properties []any, required []string) any {
-	return v.buildObjectSchema(properties, required)
-}
-
-type namedSchema struct {
-	name     string
-	schema   *Schema
-	required bool
-}
-
-func intPtrToFloatPtr(v *int) *float64 {
-	if v == nil {
-		return nil
-	}
-	f := float64(*v)
-	return &f
+	return buildObjectSchema(properties, required)
 }

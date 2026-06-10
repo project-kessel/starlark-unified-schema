@@ -41,13 +41,9 @@ func setupProcessorWithKessel(t *testing.T, reader *inmemorySourceFileReader) *P
 func processAndVisit(t *testing.T, processor *Processor) *util.SpyVisitor {
 	t.Helper()
 
-	if err := processor.ProcessAllModules(); err != nil {
-		t.Fatalf("ProcessAllModules failed: %v", err)
-	}
-
 	spy := util.NewSpyVisitor()
-	if err := processor.Visit(spy); err != nil {
-		t.Fatalf("Visit failed: %v", err)
+	if err := processor.Process(spy); err != nil {
+		t.Fatalf("Process failed: %v", err)
 	}
 
 	return spy
@@ -123,7 +119,8 @@ host = resource("hbi", fields={
 })
 `))
 
-	err := processor.ProcessAllModules()
+	spy := util.NewSpyVisitor()
+	err := processor.Process(spy)
 
 	if !assert.Error(t, err) {
 		return
@@ -204,18 +201,7 @@ host = resource("hbi", fields={
 })
 `))
 
-	if err := processor.ProcessModule("host/reporters/hbi/host.star"); err != nil {
-		t.Fatalf("ProcessModule for hbi failed: %v", err)
-	}
-
-	if err := processor.ProcessModule("host/reporters/rbac/host.star"); err != nil {
-		t.Fatalf("ProcessModule for rbac failed: %v", err)
-	}
-
-	spy := util.NewSpyVisitor()
-	if err := processor.Visit(spy); err != nil {
-		t.Fatalf("Visit failed: %v", err)
-	}
+	spy := processAndVisit(t, processor)
 
 	spy.AssertJSON(t, `{
 		"host": {

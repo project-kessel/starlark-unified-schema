@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
@@ -29,10 +30,23 @@ type node map[string]any
 
 func (v *SpyVisitor) BeginType(name string) {}
 
-func (v *SpyVisitor) VisitType(name string, commonFields []any, reporterGroups map[string][]any) any {
-	entry := node{"common": commonFields, "reporters": reporterGroups}
-	v.root[name] = entry
-	return entry
+func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any) error {
+	entry, exists := v.root[typeName].(node)
+	if !exists {
+		entry = node{"common": nil, "reporters": node{}}
+		v.root[typeName] = entry
+	}
+	if commonFields != nil && entry["common"] == nil {
+		entry["common"] = commonFields
+	}
+	if reporter != "" {
+		reporters := entry["reporters"].(node)
+		if _, dup := reporters[reporter]; dup {
+			return fmt.Errorf("resource %s: reporter '%s' registered more than once", typeName, reporter)
+		}
+		reporters[reporter] = reporterFields
+	}
+	return nil
 }
 
 func (v *SpyVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {

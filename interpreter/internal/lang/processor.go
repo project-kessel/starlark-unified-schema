@@ -8,28 +8,34 @@ import (
 	"go.starlark.net/starlarkstruct"
 )
 
-type mergedResource struct {
-	name      string
-	common    *starlark.Dict
-	reporters map[string]*starlark.Dict
-}
-
 type Processor struct {
-	thread    *starlark.Thread
-	loader    *Loader
-	resources map[string]*mergedResource
-	order     []string
+	thread *starlark.Thread
+	loader *Loader
 }
 
 func NewProcessor(loader *Loader) *Processor {
 	return &Processor{
-		loader:    loader,
-		thread:    &starlark.Thread{Name: "processor thread", Load: loader.Load},
-		resources: map[string]*mergedResource{},
+		loader: loader,
+		thread: &starlark.Thread{Name: "processor thread", Load: loader.Load},
 	}
 }
 
-func (p *Processor) ProcessModule(name string) error {
+func (p *Processor) Process(visitor output.SchemaVisitor) error {
+	names, err := p.loader.GetAllModuleNames()
+	if err != nil {
+		return err
+	}
+
+	for _, name := range names {
+		if err := p.processModule(name, visitor); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *Processor) processModule(name string, visitor output.SchemaVisitor) error {
 	globals, err := p.loader.Load(p.thread, name)
 	if err != nil {
 		return err
@@ -50,82 +56,37 @@ func (p *Processor) ProcessModule(name string) error {
 			return fmt.Errorf("resource %s: %w", varName, err)
 		}
 
-		merged, exists := p.resources[varName]
-		if !exists {
-			merged = &mergedResource{
-				name:      varName,
-				reporters: map[string]*starlark.Dict{},
-			}
-			p.resources[varName] = merged
-			p.order = append(p.order, varName)
-		}
+		visitor.BeginType(varName)
 
+		var commonFields []any
 		commonVal, err := s.Attr("common")
 		if err == nil {
 			if commonDict, ok := commonVal.(*starlark.Dict); ok {
-				if merged.common == nil || merged.common.Len() == 0 {
-					merged.common = commonDict
+				fields, err := visitMembers(commonDict, visitor)
+				if err != nil {
+					return fmt.Errorf("error visiting common fields of %s: %w", varName, err)
+				}
+				commonFields = fields
+			}
+		}
+
+		var reporterFields []any
+		if reporter != "" {
+			fieldsVal, err := s.Attr("fields")
+			if err == nil {
+				if fieldsDict, ok := fieldsVal.(*starlark.Dict); ok {
+					fields, err := visitMembers(fieldsDict, visitor)
+					if err != nil {
+						return fmt.Errorf("error visiting reporter %s fields of %s: %w", reporter, varName, err)
+					}
+					reporterFields = fields
 				}
 			}
 		}
 
-		if reporter == "" {
-			continue
-		}
-
-		fieldsVal, err := s.Attr("fields")
-		if err == nil {
-			if fieldsDict, ok := fieldsVal.(*starlark.Dict); ok {
-				if _, exists := merged.reporters[reporter]; exists {
-					return fmt.Errorf("resource %s: reporter '%s' registered more than once", varName, reporter)
-				}
-				merged.reporters[reporter] = fieldsDict
-			}
-		}
-	}
-
-	return nil
-}
-
-func (p *Processor) ProcessAllModules() error {
-	names, err := p.loader.GetAllModuleNames()
-	if err != nil {
-		return err
-	}
-
-	for _, name := range names {
-		if err := p.ProcessModule(name); err != nil {
+		if err := visitor.VisitResource(varName, reporter, commonFields, reporterFields); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func (p *Processor) Visit(visitor output.SchemaVisitor) error {
-	for _, name := range p.order {
-		res := p.resources[name]
-		visitor.BeginType(res.name)
-
-		var commonFields []any
-		if res.common != nil {
-			fields, err := visitMembers(res.common, visitor)
-			if err != nil {
-				return fmt.Errorf("error visiting common fields of %s: %w", res.name, err)
-			}
-			commonFields = fields
-		}
-
-		reporterGroups := map[string][]any{}
-		for reporterName, reporterDict := range res.reporters {
-			fields, err := visitMembers(reporterDict, visitor)
-			if err != nil {
-				return fmt.Errorf("error visiting reporter %s fields of %s: %w", reporterName, res.name, err)
-			}
-			reporterGroups[reporterName] = fields
-		}
-
-		visitor.VisitType(res.name, commonFields, reporterGroups)
 	}
 
 	return nil

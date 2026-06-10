@@ -25,24 +25,20 @@ func main() {
 	loader := lang.NewLoader(*srcDir)
 	processor := lang.NewProcessor(loader)
 
-	if err := processor.ProcessAllModules(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error processing modules: %v\n", err)
-		os.Exit(1)
-	}
-
 	jsonSchemaVisitor := output.NewJSONSchemaVisitor()
-	if err := processor.Visit(jsonSchemaVisitor); err != nil {
-		fmt.Fprintf(os.Stderr, "Error visiting resources: %v\n", err)
+	if err := processor.Process(jsonSchemaVisitor); err != nil {
+		fmt.Fprintf(os.Stderr, "Error processing schema: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(jsonSchemaVisitor.Outputs) == 0 {
+	results := jsonSchemaVisitor.Results()
+	if len(results) == 0 {
 		fmt.Println("No schemas generated.")
 		return
 	}
 
 	fmt.Printf("Writing schemas to %s/\n", *outputDir)
-	if err := output.WriteSchemas(*outputDir, jsonSchemaVisitor.Outputs); err != nil {
+	if err := output.WriteSchemas(*outputDir, results); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing schemas: %v\n", err)
 		os.Exit(1)
 	}
