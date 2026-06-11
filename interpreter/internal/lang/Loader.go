@@ -100,20 +100,27 @@ func (fs *filesystemSourceFileReader) ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func (fs *filesystemSourceFileReader) ListFiles(path string) ([]string, error) {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
+func (fs *filesystemSourceFileReader) ListFiles(root string) ([]string, error) {
+	var names []string
 
-	names := make([]string, 0, len(entries))
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
 		}
 
-		names = append(names, entry.Name())
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+
+		names = append(names, filepath.ToSlash(relative))
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return names, nil
