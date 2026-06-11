@@ -10,7 +10,6 @@ def _createRelation(kind, type):
     }
 
     # Create a struct with both data fields and methods
-    # Note: 'and' and 'or' are reserved keywords, so we use 'and_' and 'or_'
     return struct(
         kind=kind,
         type=type,
@@ -38,7 +37,7 @@ def resource_type(properties):
 
 def permissions(resource, properties):
     # Create a struct wrapper where each relation becomes a ref with logic operators
-    def make_accessor(d, additional_names=[]):
+    def make_accessor(d, additional_names=[], relation_types={}):
         # Collect existing relation names
         relation_names = []
         for key in d:
@@ -51,15 +50,25 @@ def permissions(resource, properties):
         # Then create refs with sibling attributes for ALL names
         attrs = {}
         for key in d:
-            ref_struct = make_ref_with_siblings(key, relation_names)
+            ref_struct = make_ref_with_siblings(key, relation_names, relation_types)
             attrs[key] = ref_struct
         return struct(**attrs)
 
-    def make_ref_with_siblings(name, all_relations):
-        # Create subref attributes for all OTHER relations
+    def make_ref_with_siblings(name, all_relations, relation_types):
+        # Create subref attributes
         nested_attrs = {}
+
+        # Check if this relation points to another type
+        target_type = relation_types.get(name)
+
+        if target_type != None:
+            # Cross-type reference: add subrefs for target type's relations
+            for target_rel_name in target_type:
+                nested_attrs[target_rel_name] = make_subref(name, target_rel_name)
+
+        # Always also add same-type subrefs (for recursive permissions and sibling refs)
         for other_name in all_relations:
-            if other_name != name:
+            if other_name != name and other_name not in nested_attrs:
                 nested_attrs[other_name] = make_subref(name, other_name)
 
         # Create logic operator methods
@@ -110,15 +119,35 @@ def permissions(resource, properties):
 
         return self_ref
 
-    # Pass 1: Collect permission names
+    # Pass 1: Extract relation -> target type mappings
+    relation_types = {}
+    for rel_name in resource:
+        rel_def = resource[rel_name]
+        # Check if it's a struct (from _createRelation) with a type field
+        # Use dir() to check if attribute exists, as hasattr may not work in Starlark
+        if "type" in dir(rel_def):
+            target_type = rel_def.type
+            # Check if target_type is a dict with kind="selfType" (same-type reference)
+            # For cross-type refs, target_type is a dict (the target type's relations)
+            is_self_ref = False
+            if type(target_type) == "dict":
+                kind_val = target_type.get("kind")
+                if kind_val == "selfType":
+                    is_self_ref = True
+
+            # Only store cross-type relations
+            if not is_self_ref:
+                relation_types[rel_name] = target_type
+
+    # Pass 2: Collect permission names
     permission_names = []
     for name in properties:
         permission_names.append(name)
 
-    # Pass 2: Create accessor with future permissions included
-    resource_struct = make_accessor(resource, permission_names)
+    # Pass 3: Create accessor with future permissions and type context
+    resource_struct = make_accessor(resource, permission_names, relation_types)
 
-    # Pass 3: Execute lambdas and add results
+    # Pass 4: Execute lambdas and add results
     for name in properties:
         factory = properties[name]
         prop = factory(resource_struct)

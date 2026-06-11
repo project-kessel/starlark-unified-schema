@@ -32,7 +32,11 @@ func (v *SpyVisitor) AssertJSON(t *testing.T, expected string) bool {
 		return false
 	}
 
-	return assert.JSONEq(t, expected, string(actual))
+	success := assert.JSONEq(t, expected, string(actual))
+	if !success {
+		t.Logf("actual json: %s", string(actual))
+	}
+	return success
 }
 
 func (V *SpyVisitor) VisitAnd(left any, right any) any {

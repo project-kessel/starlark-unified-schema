@@ -165,51 +165,59 @@ permissions(resource, {
 }]`)
 }
 
-func TestSubRefPermission(t *testing.T) {
+func TestSubRefPermissionAcrossTypes(t *testing.T) {
 	assertSourceMatchesGolden(t,
 		`
 load("kessel.star", "self", "boolean", "permissions", "resource_type", "atMostOne")
-resource = resource_type({
-	"parent": atMostOne(self()),
+container = resource_type({
 	"flag": boolean(self())
 })
 
+resource = resource_type({
+	"container": atMostOne(container)
+})
+
 permissions(resource, {
-	"permission": lambda r: r.parent.flag
+	"permission": lambda r: r.container.flag
 })
 `,
 		`
 [{
-	"kind":"type", 
-	"namespace":"test", 
-	"name":"resource", 
+	"kind":"type",
+	"namespace":"test",
+	"name":"container",
 	"relations":[{
 		"kind":"relation",
 		"name":"flag",
 		"body": {
 			"kind":"assignable",
 			"typeNamespace":"test",
-			"typeName":"resource",
+			"typeName":"container",
 			"cardinality":"Boolean"
 		}
-	},
-	{
+	}]
+},
+{
+	"kind":"type",
+	"namespace":"test",
+	"name":"resource",
+	"relations":[{
 		"kind":"relation",
-		"name":"parent",
+		"name":"container",
 		"body": {
 			"kind":"assignable",
 			"typeNamespace":"test",
-			"typeName":"resource",
+			"typeName":"container",
 			"cardinality":"AtMostOne"
 		}
 	},
 	{
-		"kind": "relation",
-		"name": "permission",
+		"kind":"relation",
+		"name":"permission",
 		"body": {
 			"kind":"subref",
-			"name": "parent",
-			"sub": "flag"
+			"name":"container",
+			"sub":"flag"
 		}
 	}]
 }]`)
