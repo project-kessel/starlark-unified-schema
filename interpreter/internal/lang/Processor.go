@@ -54,7 +54,7 @@ func (p *Processor) ProcessModule(name string, visitor output.Visitor) error {
 		}
 	}
 
-	// Sort types alphabetically by name
+	// Sort types alphabetically by name for deterministic output
 	sort.Slice(types, func(i, j int) bool {
 		return types[i].name < types[j].name
 	})
@@ -131,6 +131,30 @@ func getAttr(value starlark.Value, attrName string) (starlark.Value, bool, error
 		return val, true, nil
 	}
 	return nil, false, fmt.Errorf("value is not a dict or struct, got: %T", value)
+}
+
+func getStringAttr(value starlark.Value, attrName, contextName string) (string, error) {
+	attrValue, found, err := getAttr(value, attrName)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("%s missing '%s' field", contextName, attrName)
+	}
+
+	str, err := convert_to_string(attrValue)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert %s to string: %w", attrName, err)
+	}
+	return str, nil
+}
+
+func sortStarlarkDictItems(items []starlark.Tuple) {
+	sort.Slice(items, func(i, j int) bool {
+		nameI, _ := convert_to_string(items[i][0])
+		nameJ, _ := convert_to_string(items[j][0])
+		return nameI < nameJ
+	})
 }
 
 func (p *Processor) processCardinalityRelation(relationValue starlark.Value, kind string, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
@@ -217,94 +241,46 @@ func (p *Processor) processSubrefExpression(subrefValue starlark.Value, visitor 
 	return visitor.VisitSubRelationExpression(name, sub), nil
 }
 
-func (p *Processor) processOrExpression(orValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
-	leftValue, found, err := getAttr(orValue, "left")
+func (p *Processor) processBinaryExpression(value starlark.Value, operatorName string, parentNamespace, parentTypeName string, visitor output.Visitor, visitorFunc func(any, any) any) (any, error) {
+	leftValue, found, err := getAttr(value, "left")
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("or expression missing 'left' field")
+		return nil, fmt.Errorf("%s expression missing 'left' field", operatorName)
 	}
 
 	left, err := p.processRelationValue(leftValue, parentNamespace, parentTypeName, visitor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to process or left operand: %w", err)
+		return nil, fmt.Errorf("failed to process %s left operand: %w", operatorName, err)
 	}
 
-	rightValue, found, err := getAttr(orValue, "right")
+	rightValue, found, err := getAttr(value, "right")
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("or expression missing 'right' field")
+		return nil, fmt.Errorf("%s expression missing 'right' field", operatorName)
 	}
 
 	right, err := p.processRelationValue(rightValue, parentNamespace, parentTypeName, visitor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to process or right operand: %w", err)
+		return nil, fmt.Errorf("failed to process %s right operand: %w", operatorName, err)
 	}
 
-	return visitor.VisitOr(left, right), nil
+	return visitorFunc(left, right), nil
+}
+
+func (p *Processor) processOrExpression(orValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
+	return p.processBinaryExpression(orValue, "or", parentNamespace, parentTypeName, visitor, visitor.VisitOr)
 }
 
 func (p *Processor) processAndExpression(andValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
-	leftValue, found, err := getAttr(andValue, "left")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("and expression missing 'left' field")
-	}
-
-	left, err := p.processRelationValue(leftValue, parentNamespace, parentTypeName, visitor)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process and left operand: %w", err)
-	}
-
-	rightValue, found, err := getAttr(andValue, "right")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("and expression missing 'right' field")
-	}
-
-	right, err := p.processRelationValue(rightValue, parentNamespace, parentTypeName, visitor)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process and right operand: %w", err)
-	}
-
-	return visitor.VisitAnd(left, right), nil
+	return p.processBinaryExpression(andValue, "and", parentNamespace, parentTypeName, visitor, visitor.VisitAnd)
 }
 
 func (p *Processor) processUnlessExpression(unlessValue starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
-	leftValue, found, err := getAttr(unlessValue, "left")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("unless expression missing 'left' field")
-	}
-
-	left, err := p.processRelationValue(leftValue, parentNamespace, parentTypeName, visitor)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process unless left operand: %w", err)
-	}
-
-	rightValue, found, err := getAttr(unlessValue, "right")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("unless expression missing 'right' field")
-	}
-
-	right, err := p.processRelationValue(rightValue, parentNamespace, parentTypeName, visitor)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process unless right operand: %w", err)
-	}
-
-	return visitor.VisitUnless(left, right), nil
+	return p.processBinaryExpression(unlessValue, "unless", parentNamespace, parentTypeName, visitor, visitor.VisitUnless)
 }
 
 func (p *Processor) processRelationValue(value starlark.Value, parentNamespace, parentTypeName string, visitor output.Visitor) (any, error) {
@@ -349,11 +325,7 @@ func (p *Processor) processTypeRelations(typeDict *starlark.Dict, parentNamespac
 
 	// Get dict items and sort by name for deterministic output
 	items := typeDict.Items()
-	sort.Slice(items, func(i, j int) bool {
-		nameI, _ := convert_to_string(items[i][0])
-		nameJ, _ := convert_to_string(items[j][0])
-		return nameI < nameJ
-	})
+	sortStarlarkDictItems(items)
 
 	// Iterate through sorted dict items
 	for _, item := range items {

@@ -9,25 +9,11 @@ def _createRelation(kind, type):
         "type": type,
     }
 
-    def and_method(other):
-        return {"kind": "and", "left": relation, "right": other}
-
-    def or_method(other):
-        return {"kind": "or", "left": relation, "right": other}
-
-    def unless_method(other):
-        return {"kind": "unless", "left": relation, "right": other}
-
     # Create a struct with both data fields and methods
     # Note: 'and' and 'or' are reserved keywords, so we use 'and_' and 'or_'
     return struct(
         kind=kind,
         type=type,
-        relationName=None,
-        parentType=None,
-        and_=and_method,
-        or_=or_method,
-        unless_=unless_method,
     )
 
 def atMostOne(type):
