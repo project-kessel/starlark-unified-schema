@@ -52,13 +52,17 @@ def resource_type(properties):
 
 def permissions(resource, properties):
     # Create a struct wrapper where each relation becomes a ref with logic operators
-    def make_accessor(d):
-        # First collect all relation names
+    def make_accessor(d, additional_names=[]):
+        # Collect existing relation names
         relation_names = []
         for key in d:
             relation_names.append(key)
 
-        # Then create refs with sibling attributes
+        # Add future permission names
+        for name in additional_names:
+            relation_names.append(name)
+
+        # Then create refs with sibling attributes for ALL names
         attrs = {}
         for key in d:
             ref_struct = make_ref_with_siblings(key, relation_names)
@@ -120,8 +124,15 @@ def permissions(resource, properties):
 
         return self_ref
 
-    resource_struct = make_accessor(resource)
+    # Pass 1: Collect permission names
+    permission_names = []
+    for name in properties:
+        permission_names.append(name)
 
+    # Pass 2: Create accessor with future permissions included
+    resource_struct = make_accessor(resource, permission_names)
+
+    # Pass 3: Execute lambdas and add results
     for name in properties:
         factory = properties[name]
         prop = factory(resource_struct)

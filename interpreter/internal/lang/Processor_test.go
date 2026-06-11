@@ -260,7 +260,7 @@ permissions(resource, {
 			"kind":"or",
 			"left": {
 				"kind":"ref",
-				"name": "flag",
+				"name": "flag"
 			},
 			"right": {
 				"kind":"subref",
