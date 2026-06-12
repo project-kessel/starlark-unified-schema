@@ -154,3 +154,13 @@ def permissions(resource, properties):
 
         # Store the result directly - it's already in the right format
         resource[name] = prop
+
+def any(root, *refs):
+    for ref in refs:
+        root = root.union(ref)
+    return root
+
+def all(root, *refs):
+    for ref in refs:
+        root = root.intersect(ref)
+    return root

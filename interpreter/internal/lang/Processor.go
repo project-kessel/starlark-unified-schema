@@ -133,22 +133,6 @@ func getAttr(value starlark.Value, attrName string) (starlark.Value, bool, error
 	return nil, false, fmt.Errorf("value is not a dict or struct, got: %T", value)
 }
 
-func getStringAttr(value starlark.Value, attrName, contextName string) (string, error) {
-	attrValue, found, err := getAttr(value, attrName)
-	if err != nil {
-		return "", err
-	}
-	if !found {
-		return "", fmt.Errorf("%s missing '%s' field", contextName, attrName)
-	}
-
-	str, err := convert_to_string(attrValue)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert %s to string: %w", attrName, err)
-	}
-	return str, nil
-}
-
 func sortStarlarkDictItems(items []starlark.Tuple) {
 	sort.Slice(items, func(i, j int) bool {
 		nameI, _ := convert_to_string(items[i][0])

@@ -117,3 +117,15 @@ func (V *SpyVisitor) VisitType(namespace string, name string, relations []any) a
 
 	return result
 }
+
+func (V *SpyVisitor) GetOutput() ([]OutputEntry, error) {
+	contents, err := json.MarshalIndent(V.root, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	return []OutputEntry{{
+		Path:     "output.json",
+		Contents: contents,
+	}}, nil
+}

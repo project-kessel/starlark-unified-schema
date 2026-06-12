@@ -15,4 +15,6 @@ type Visitor interface {
 	BeginType(namespace string, name string)
 	// Construct type expression
 	VisitType(namespace string, name string, relations []any) any
+
+	GetOutput() ([]OutputEntry, error)
 }
