@@ -57,6 +57,10 @@ func (k *KSILVisitor) VisitSubRelationExpression(name string, sub string) any {
 }
 
 func (k *KSILVisitor) VisitAssignableExpression(typeNamespace string, typeName string, cardinality string) any {
+	if cardinality == "Many" { //Convert to legacy cardinality
+		cardinality = "Any"
+	}
+
 	return &intermediate.RelationBody{
 		Kind:        "self",
 		Types:       []*intermediate.TypeReference{{Namespace: typeNamespace, Name: typeName}},
