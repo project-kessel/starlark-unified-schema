@@ -6,7 +6,7 @@ billing_account = {
 }
 
 permissions(billing_account, {
-    "enabled_workspaces": lambda b: b.workspace.union(b.workspace.descendents)
+    "enabled_workspaces": lambda b: b.workspace.union(b.workspace.descendants)
 })
 
 service = {
@@ -19,11 +19,11 @@ permissions(service,
 { 
     "does_workspace_have_service_preference": lambda s: any(
         s.allowed_workspaces,
-        s.allowed_workspaces.descendents,
+        s.allowed_workspaces.descendants,
         s.parent.does_workspace_have_service_preference
     ),
 
     "does_workspace_have_license": lambda s: s.billing_account.enabled_workspaces,
 
-    "can_workspace_use_service": lambda s: s.does_workspace_have_service_preference.union(s.does_workspace_have_license)
+    "can_workspace_use_service": lambda s: s.does_workspace_have_service_preference.intersect(s.does_workspace_have_license)
 })
