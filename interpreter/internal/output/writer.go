@@ -1,11 +1,15 @@
 package output
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 )
+
+type OutputEntry struct {
+	Path     string
+	Contents []byte
+}
 
 func WriteSchemas(outputDir string, entries []OutputEntry) error {
 	for _, entry := range entries {
@@ -16,13 +20,7 @@ func WriteSchemas(outputDir string, entries []OutputEntry) error {
 			return fmt.Errorf("error creating directory %s: %w", dir, err)
 		}
 
-		data, err := json.MarshalIndent(entry.Schema, "", "  ")
-		if err != nil {
-			return fmt.Errorf("error marshaling schema for %s: %w", entry.Path, err)
-		}
-		data = append(data, '\n')
-
-		if err := os.WriteFile(fullPath, data, 0644); err != nil {
+		if err := os.WriteFile(fullPath, entry.Contents, 0644); err != nil {
 			return fmt.Errorf("error writing %s: %w", fullPath, err)
 		}
 

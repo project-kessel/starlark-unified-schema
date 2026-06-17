@@ -97,6 +97,10 @@ func (v *SpyVisitor) VisitObjectDataType(properties []any, required []string) an
 	return node{"kind": "object", "properties": properties, "required": required}
 }
 
+func (v *SpyVisitor) Results() ([]output.OutputEntry, error) {
+	return nil, nil
+}
+
 func (v *SpyVisitor) AssertJSON(t *testing.T, expected string) bool {
 	actual, err := json.Marshal(v.root)
 	if !assert.NoError(t, err) {

@@ -1,6 +1,7 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -9,11 +10,6 @@ import (
 const schemaURI = "http://json-schema.org/draft-07/schema#"
 
 type node = map[string]any
-
-type OutputEntry struct {
-	Path   string
-	Schema any
-}
 
 type JSONSchemaVisitor struct {
 	root node
@@ -44,7 +40,7 @@ func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, comm
 	return nil
 }
 
-func (v *JSONSchemaVisitor) Results() []OutputEntry {
+func (v *JSONSchemaVisitor) Results() ([]OutputEntry, error) {
 	var entries []OutputEntry
 
 	typeNames := make([]string, 0, len(v.root))
@@ -62,9 +58,13 @@ func (v *JSONSchemaVisitor) Results() []OutputEntry {
 		}
 		commonSchema := buildObjectSchema(commonFields, nil)
 		commonSchema["$schema"] = schemaURI
+		commonSchemaJSON, err := json.MarshalIndent(commonSchema, "", "  ")
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling common schema for %s: %w", typeName, err)
+		}
 		entries = append(entries, OutputEntry{
-			Path:   filepath.Join(typeName, "common_representation.json"),
-			Schema: commonSchema,
+			Path:     filepath.Join(typeName, "common_representation.json"),
+			Contents: commonSchemaJSON,
 		})
 
 		reporters := entry["reporters"].(node)
@@ -81,14 +81,18 @@ func (v *JSONSchemaVisitor) Results() []OutputEntry {
 			}
 			reporterSchema := buildObjectSchema(reporterFields, nil)
 			reporterSchema["$schema"] = schemaURI
+			reporterSchemaJSON, err := json.MarshalIndent(reporterSchema, "", "  ")
+			if err != nil {
+				return nil, fmt.Errorf("error marshaling reporter schema for %s: %w", typeName, err)
+			}
 			entries = append(entries, OutputEntry{
-				Path:   filepath.Join(typeName, "reporters", reporterName, fmt.Sprintf("%s.json", typeName)),
-				Schema: reporterSchema,
+				Path:     filepath.Join(typeName, "reporters", reporterName, fmt.Sprintf("%s.json", typeName)),
+				Contents: reporterSchemaJSON,
 			})
 		}
 	}
 
-	return entries
+	return entries, nil
 }
 
 func buildObjectSchema(fields []any, explicitRequired []string) node {

@@ -16,4 +16,6 @@ type SchemaVisitor interface {
 	VisitCompositeDataType(dataTypes []any) any
 	VisitArrayDataType(items any) any
 	VisitObjectDataType(properties []any, required []string) any
+
+	Results() ([]OutputEntry, error)
 }
