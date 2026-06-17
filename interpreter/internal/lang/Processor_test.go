@@ -1,36 +1,18 @@
 package lang
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
-const kesselStarContent = `
-def resource(reporter, common={}, fields={}):
-    return struct(kind="resource", reporter=reporter, common=common, fields=fields)
-
-def field(type, required=False, description=None):
-    return struct(kind="field", type=type, required=required, description=description)
-
-def text(minLength=None, maxLength=None, regex=None):
-    return struct(kind="text", minLength=minLength, maxLength=maxLength, regex=regex)
-
-def uuid():
-    return struct(kind="uuid")
-
-def nullable(inner):
-    return struct(kind="nullable", inner=inner)
-
-def union(left, right):
-    return struct(kind="union", left=left, right=right)
-`
-
 func setupProcessorWithKessel(t *testing.T, reader *inmemorySourceFileReader) *Processor {
 	t.Helper()
 
-	if err := reader.AddFile("kessel.star", []byte(kesselStarContent)); err != nil {
+	if err := addRealSchemaFile(reader, "kessel.star"); err != nil {
 		t.Fatalf("failed to add kessel.star: %v", err)
 	}
 
@@ -212,4 +194,12 @@ host = resource("hbi", fields={
 			}
 		}
 	}`)
+}
+
+func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {
+	contents, err := os.ReadFile(filepath.Join("../../../schema/", path))
+	if err != nil {
+		return err
+	}
+	return reader.AddFile(path, contents)
 }
