@@ -2,7 +2,7 @@ package output
 
 type SchemaVisitor interface {
 	BeginType(name string)
-	VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any) error
+	VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any, commonRelations []any, reporterRelations []any) error
 
 	VisitDataField(name string, required bool, description *string, dataType any) any
 
@@ -16,6 +16,17 @@ type SchemaVisitor interface {
 	VisitCompositeDataType(dataTypes []any) any
 	VisitArrayDataType(items any) any
 	VisitObjectDataType(properties []any, required []string) any
+
+	VisitAnd(left any, right any) any
+	VisitOr(left any, right any) any
+	VisitUnless(left any, right any) any
+	VisitReferenceExpression(name string) any
+	VisitSubReferenceExpression(name string, sub string) any
+
+	VisitRelation(reporter string, typeName string, cardinality string, idType any) any
+
+	BeginPermission(name string)
+	VisitPermission(name string, body any) any
 
 	Results() ([]OutputEntry, error)
 }

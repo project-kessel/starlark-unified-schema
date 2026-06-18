@@ -88,7 +88,7 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 			}
 		}
 
-		if err := visitor.VisitResource(varName, reporter, commonFields, reporterFields); err != nil {
+		if err := visitor.VisitResource(varName, reporter, commonFields, reporterFields, []any{}, []any{}); err != nil {
 			return err
 		}
 	}

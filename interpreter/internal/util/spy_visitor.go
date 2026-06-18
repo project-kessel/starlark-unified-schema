@@ -30,22 +30,23 @@ type node map[string]any
 
 func (v *SpyVisitor) BeginType(name string) {}
 
-func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any) error {
+func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any, commonRelations []any, reporterRelations []any) error {
 	entry, exists := v.root[typeName].(node)
 	if !exists {
 		entry = node{"common": nil, "reporters": node{}}
 		v.root[typeName] = entry
 	}
 	if commonFields != nil && entry["common"] == nil {
-		entry["common"] = commonFields
+		entry["common"] = node{"fields": commonFields, "relations": commonRelations}
 	}
 	if reporter != "" {
 		reporters := entry["reporters"].(node)
 		if _, dup := reporters[reporter]; dup {
 			return fmt.Errorf("resource %s: reporter '%s' registered more than once", typeName, reporter)
 		}
-		reporters[reporter] = reporterFields
+		reporters[reporter] = node{"fields": reporterFields, "relations": reporterRelations}
 	}
+
 	return nil
 }
 
@@ -93,8 +94,41 @@ func (v *SpyVisitor) VisitArrayDataType(items any) any {
 	return node{"kind": "array", "items": items}
 }
 
-func (v *SpyVisitor) VisitObjectDataType(properties []any, required []string) any {
+func (v *SpyVisitor) VisitObjectDataType(properties []any, required []string) any { //TODO: the individual properties know if they're required, so why do we capture it separately? Also, what about field names?
 	return node{"kind": "object", "properties": properties, "required": required}
+}
+
+func (v *SpyVisitor) VisitAnd(left any, right any) any {
+	return node{"kind": "and", "left": left, "right": right}
+}
+
+func (v *SpyVisitor) VisitOr(left any, right any) any {
+	return node{"kind": "or", "left": left, "right": right}
+}
+
+func (v *SpyVisitor) VisitUnless(left any, right any) any {
+	return node{"kind": "unless", "left": left, "right": right}
+}
+
+func (v *SpyVisitor) VisitReferenceExpression(name string) any {
+	return node{"kind": "reference", "name": name}
+}
+
+func (v *SpyVisitor) VisitSubReferenceExpression(name string, sub string) any {
+	return node{"kind": "subreference", "name": name, "sub": sub}
+}
+
+func (v *SpyVisitor) VisitRelation(reporter string, typeName string, cardinality string, dataType any) any {
+	return node{"kind": "relation", "reporter": reporter, "typeName": typeName, "cardinality": cardinality, "dataType": dataType}
+}
+
+func (v *SpyVisitor) BeginPermission(name string) {
+
+}
+
+// Construct relation expression
+func (v *SpyVisitor) VisitPermission(name string, body any) any {
+	return node{"kind": "relation", "name": name, "body": body}
 }
 
 func (v *SpyVisitor) Results() ([]output.OutputEntry, error) {
@@ -106,5 +140,9 @@ func (v *SpyVisitor) AssertJSON(t *testing.T, expected string) bool {
 	if !assert.NoError(t, err) {
 		return false
 	}
-	return assert.JSONEq(t, expected, string(actual))
+	success := assert.JSONEq(t, expected, string(actual))
+	if !success {
+		t.Logf("Actual JSON did not match expected: %s", string(actual))
+	}
+	return success
 }

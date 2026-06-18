@@ -47,8 +47,8 @@ host = {
 load("kessel.star", "resource", "field", "uuid")
 load("host/common_representation.star", common="host")
 
-host = resource("hbi", common, {
-    "insights_id": field(type=uuid()),
+host = resource(reporter="hbi", id_type=uuid(), common=common, fields={
+    "insights_id": field(type=uuid())
 })
 `))
 
@@ -56,9 +56,9 @@ host = resource("hbi", common, {
 
 	spy.AssertJSON(t, `{
 		"host": {
-			"common": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
+			"common": {"fields": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []},
 			"reporters": {
-				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]
+				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}], "relations": []}
 			}
 		}
 	}`)
@@ -88,7 +88,7 @@ func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
 	reader.AddFile("host/reporters/hbi/host.star", []byte(`
 load("kessel.star", "resource", "field", "uuid")
 
-host = resource("hbi", fields={
+host = resource("hbi", id_type=uuid(), fields={
     "insights_id": field(type=uuid()),
 })
 `))
@@ -96,7 +96,7 @@ host = resource("hbi", fields={
 	reader.AddFile("host/reporters/hbi/duplicate.star", []byte(`
 load("kessel.star", "resource", "field", "uuid")
 
-host = resource("hbi", fields={
+host = resource("hbi", id_type=uuid(), fields={
     "satellite_id": field(type=uuid()),
 })
 `))
@@ -135,16 +135,16 @@ host = {
 load("kessel.star", "resource", "field", "uuid")
 load("host/common_representation.star", common="host")
 
-host = resource("hbi", common, {
+host = resource("hbi", id_type=uuid(), common=common, fields={
     "insights_id": field(type=uuid()),
 })
 `))
 
 	reader.AddFile("host/reporters/acm/host.star", []byte(`
-load("kessel.star", "resource", "field", "text")
+load("kessel.star", "resource", "field", "text", "uuid")
 load("host/common_representation.star", common="host")
 
-host = resource("acm", common, {
+host = resource("acm", id_type=uuid(), common=common, fields={
     "cluster_id": field(type=text(), required=True),
 })
 `))
@@ -153,10 +153,10 @@ host = resource("acm", common, {
 
 	spy.AssertJSON(t, `{
 		"host": {
-			"common": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
+			"common": {"fields": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []},
 			"reporters": {
-				"acm": [{"name": "cluster_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}],
-				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]
+				"acm": {"fields": [{"name": "cluster_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []},
+				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}], "relations": []}
 			}
 		}
 	}`)
@@ -167,9 +167,9 @@ func TestProcessorProcessesDependencyModuleAfterLoadCaching(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/reporters/rbac/host.star", []byte(`
-load("kessel.star", "resource", "field", "text")
+load("kessel.star", "resource", "field", "text", "uuid")
 
-host = resource("rbac", fields={
+host = resource("rbac", id_type=uuid(), fields={
     "role": field(type=text(), required=True),
 })
 `))
@@ -178,7 +178,7 @@ host = resource("rbac", fields={
 load("kessel.star", "resource", "field", "uuid")
 load("host/reporters/rbac/host.star", rbac_host="host")
 
-host = resource("hbi", fields={
+host = resource("hbi", id_type=uuid(), fields={
     "insights_id": field(type=uuid()),
 })
 `))
@@ -189,11 +189,58 @@ host = resource("hbi", fields={
 		"host": {
 			"common": null,
 			"reporters": {
-				"hbi": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}],
-				"rbac": [{"name": "role", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}]
+				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}], "relations": []},
+				"rbac": {"fields": [{"name": "role", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []}
 			}
 		}
 	}`)
+}
+
+func TestAssignableResourceReference(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/assignable_resource_reference.star", []byte(`
+load("kessel.star", "atMostOne", "resource")
+other = resource("test", {})
+
+resource = resource("test", {
+	"other": atMostOne(other)
+	})
+`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `{
+	"resource": {
+		"common": null,
+		"reporters": {
+			"test": [{"name": "other", "required": false, "type": {"kind": "assignable", "typeNamespace": "test", "typeName": "other", "cardinality": "AtMostOne"}}]
+		}
+	}
+}
+
+[{
+	"kind":"type",
+	"namespace":"test",
+	"name":"other",
+	"relations":[]
+},
+{
+	"kind":"type", 
+	"namespace":"test", 
+	"name":"resource", 
+	"relations":[{
+		"kind":"relation",
+		"name":"other",
+		"body": {
+			"kind":"assignable",
+			"typeNamespace":"test",
+			"typeName":"other",
+			"cardinality":"AtMostOne"
+		}
+	}]
+}]`)
 }
 
 func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {

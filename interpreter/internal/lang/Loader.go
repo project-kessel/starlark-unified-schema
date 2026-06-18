@@ -161,7 +161,7 @@ func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
 func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
 	names := make([]string, 0, len(im.files))
 
-	for name, _ := range im.files {
+	for name := range im.files {
 		relative, err := filepath.Rel(path, name)
 		if err != nil {
 			return nil, err

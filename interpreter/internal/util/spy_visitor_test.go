@@ -12,7 +12,7 @@ func TestSpyVisitorCapturesResource(t *testing.T) {
 	spy.BeginType("host")
 	common := []any{spy.VisitDataField("workspace_id", true, nil, spy.VisitTextDataType(nil, nil, nil))}
 	hbiFields := []any{spy.VisitDataField("insights_id", false, nil, spy.VisitUUIDDataType())}
-	err := spy.VisitResource("host", "hbi", common, hbiFields)
+	err := spy.VisitResource("host", "hbi", common, hbiFields, []any{}, []any{})
 	assert.NoError(t, err)
 
 	spy.AssertJSON(t, `{

@@ -21,7 +21,7 @@ func NewJSONSchemaVisitor() *JSONSchemaVisitor {
 
 func (v *JSONSchemaVisitor) BeginType(name string) {}
 
-func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any) error {
+func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any, commonRelations []any, reporterRelations []any) error {
 	entry, exists := v.root[typeName].(node)
 	if !exists {
 		entry = node{"common": nil, "reporters": node{}}
@@ -186,4 +186,47 @@ func (v *JSONSchemaVisitor) VisitArrayDataType(items any) any {
 
 func (v *JSONSchemaVisitor) VisitObjectDataType(properties []any, required []string) any {
 	return buildObjectSchema(properties, required)
+}
+
+func (v *JSONSchemaVisitor) VisitAnd(left any, right any) any {
+	if left != nil {
+		return left
+	}
+	return right
+}
+
+func (v *JSONSchemaVisitor) VisitOr(left any, right any) any {
+	if left != nil {
+		return left
+	}
+	return right
+}
+
+func (v *JSONSchemaVisitor) VisitUnless(left any, right any) any {
+	if left != nil {
+		return left
+	}
+	return right
+}
+
+func (v *JSONSchemaVisitor) VisitReferenceExpression(name string) any {
+	return nil
+}
+
+func (v *JSONSchemaVisitor) VisitSubReferenceExpression(name string, sub string) any {
+	return nil
+}
+
+func (v *JSONSchemaVisitor) VisitRelation(reporter string, typeName string, cardinality string, dataType any) any {
+	panic("not implemented") // TODO: return a data field of the id type of the indicated resource type ... which we need to find
+	// Also, it might be smart to change the name of this vs the ones called from permissions. We actually might not need to implement the permission ones at all.
+}
+
+func (v *JSONSchemaVisitor) BeginPermission(name string) {
+
+}
+
+// Construct relation expression
+func (v *JSONSchemaVisitor) VisitPermission(name string, body any) any {
+	panic("not implemented") // TODO: Implement
 }
