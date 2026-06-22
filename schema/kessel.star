@@ -39,8 +39,9 @@ def _make_ref(name, field_type):
     }
 
     # Add subrefs
-    for subref_name in field_type:
-        attrs[subref_name] = _make_subref(name, field_type[subref_name])
+    for subref_name in field_type.fields:
+        if field_type.kind in relationKinds:
+            attrs[subref_name] = _make_subref(name, subref_name)
 
     # Create initial struct
     ref = struct(
@@ -120,7 +121,8 @@ def _process_permissions(common, object, permissions):
     return object
 
 def resource(reporter, id_type, common={}, fields={}, permissions={}):
-    return _process_permissions(common, fields, permissions)
+    _process_permissions(common, fields, permissions)
+    return struct(kind="resource", reporter=reporter, id_type=id_type, common=common, fields=fields)
 
 def text(minLength=None, maxLength=None, regex=None):
     return struct(kind="text", minLength=minLength, maxLength=maxLength, regex=regex)
