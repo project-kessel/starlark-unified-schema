@@ -204,7 +204,7 @@ func TestAssignableResourceReference(t *testing.T) {
 load("kessel.star", "atMostOne", "resource")
 other = resource("test", {})
 
-resource = resource("test", {
+this_resource = resource("test", {
 	"other": atMostOne(other)
 	})
 `))
@@ -212,7 +212,7 @@ resource = resource("test", {
 	spy := processAndVisit(t, processor)
 
 	spy.AssertJSON(t, `{
-	"resource": {
+	"this_resource": {
 		"common": null,
 		"reporters": {
 			"test": [{"name": "other", "required": false, "type": {"kind": "assignable", "typeNamespace": "test", "typeName": "other", "cardinality": "AtMostOne"}}]
