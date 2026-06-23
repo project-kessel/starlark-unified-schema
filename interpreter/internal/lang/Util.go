@@ -76,6 +76,28 @@ func getStringAttr(name string, s *starlarkstruct.Struct) (string, error) {
 	return string(str), nil
 }
 
+func getStructAttr(name string, s *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {
+	v, err := s.Attr(name)
+	if err != nil {
+		return nil, fmt.Errorf("error accessing member %s of struct %+v: %w", name, s, err)
+	}
+	if structValue, ok := v.(*starlarkstruct.Struct); ok {
+		return structValue, nil
+	}
+	return nil, fmt.Errorf("expected struct for %s, got %s", name, v.Type())
+}
+
+func getDictAttr(name string, s *starlarkstruct.Struct) (*starlark.Dict, error) {
+	v, err := s.Attr(name)
+	if err != nil {
+		return nil, fmt.Errorf("error accessing member %s of struct %+v: %w", name, s, err)
+	}
+	if dictValue, ok := v.(*starlark.Dict); ok {
+		return dictValue, nil
+	}
+	return nil, fmt.Errorf("expected dict for %s, got %s", name, v.Type())
+}
+
 func getBoolAttr(name string, s *starlarkstruct.Struct) (bool, error) {
 	v, err := s.Attr(name)
 	if err != nil {

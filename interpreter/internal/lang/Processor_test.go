@@ -56,9 +56,9 @@ host = resource(reporter="hbi", id_type=uuid(), common=common, fields={
 
 	spy.AssertJSON(t, `{
 		"host": {
-			"common": {"fields": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []},
+			"common": {"fields": [{"name": "workspace_id", "required": true, "type": {"kind": "text"}}]},
 			"reporters": {
-				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}], "relations": []}
+				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]}
 			}
 		}
 	}`)
@@ -152,14 +152,13 @@ host = resource("acm", id_type=uuid(), common=common, fields={
 	spy := processAndVisit(t, processor)
 
 	spy.AssertJSON(t, `{
-		"host": {
-			"common": {"fields": [{"name": "workspace_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []},
-			"reporters": {
-				"acm": {"fields": [{"name": "cluster_id", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []},
-				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}], "relations": []}
-			}
+	"host": {
+		"common": {"fields": [{"name": "workspace_id", "required": true, "type": {"kind": "text"}}]},
+		"reporters": {
+			"acm": {"fields": [{"name": "cluster_id", "required": true, "type": {"kind": "text"}}]},
+			"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]}}
 		}
-	}`)
+}`)
 }
 
 func TestProcessorProcessesDependencyModuleAfterLoadCaching(t *testing.T) {
@@ -186,14 +185,14 @@ host = resource("hbi", id_type=uuid(), fields={
 	spy := processAndVisit(t, processor)
 
 	spy.AssertJSON(t, `{
-		"host": {
-			"common": null,
-			"reporters": {
-				"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}], "relations": []},
-				"rbac": {"fields": [{"name": "role", "required": true, "type": {"kind": "text", "minLength": null, "maxLength": null, "regex": null}}], "relations": []}
-			}
+	"host": {
+		"common": {},
+		"reporters": {
+			"hbi": {"fields": [{"name": "insights_id", "required": false, "type": {"kind": "uuid"}}]},
+			"rbac": {"fields": [{"name": "role", "required": true, "type": {"kind": "text"}}]}
 		}
-	}`)
+	}
+}`)
 }
 
 func TestAssignableResourceReference(t *testing.T) {
@@ -201,46 +200,35 @@ func TestAssignableResourceReference(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/assignable_resource_reference.star", []byte(`
-load("kessel.star", "atMostOne", "resource")
-other = resource("test", {})
+load("kessel.star", "atMostOne", "resource", "uuid")
+other = resource("test", id_type=uuid())
 
-this_resource = resource("test", {
+this_resource = resource("test", id_type=uuid(), fields={
 	"other": atMostOne(other)
 	})
 `))
 
 	spy := processAndVisit(t, processor)
 
-	spy.AssertJSON(t, `{
-	"this_resource": {
-		"common": null,
+	spy.AssertJSON(t, `
+{
+	"other": {
+		"common": {},
 		"reporters": {
-			"test": [{"name": "other", "required": false, "type": {"kind": "assignable", "typeNamespace": "test", "typeName": "other", "cardinality": "AtMostOne"}}]
+			"test": {}
+		}
+	},
+	"this_resource": {
+		"common": {},
+		"reporters": {
+			"test": {
+				"relations": [
+					{"kind": "relation", "name": "other", "cardinality": "AtMostOne", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "other"}
+				]
+			}
 		}
 	}
-}
-
-[{
-	"kind":"type",
-	"namespace":"test",
-	"name":"other",
-	"relations":[]
-},
-{
-	"kind":"type", 
-	"namespace":"test", 
-	"name":"resource", 
-	"relations":[{
-		"kind":"relation",
-		"name":"other",
-		"body": {
-			"kind":"assignable",
-			"typeNamespace":"test",
-			"typeName":"other",
-			"cardinality":"AtMostOne"
-		}
-	}]
-}]`)
+}`)
 }
 
 func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {

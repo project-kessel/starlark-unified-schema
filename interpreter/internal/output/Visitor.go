@@ -1,8 +1,14 @@
 package output
 
+type Members struct {
+	DataFields     []any
+	RelationFields []any
+	Permissions    []any
+}
+
 type SchemaVisitor interface {
 	BeginType(name string)
-	VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any, commonRelations []any, reporterRelations []any) error
+	VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members) error
 
 	VisitDataField(name string, required bool, description *string, dataType any) any
 
@@ -23,7 +29,7 @@ type SchemaVisitor interface {
 	VisitReferenceExpression(name string) any
 	VisitSubReferenceExpression(name string, sub string) any
 
-	VisitRelation(reporter string, typeName string, cardinality string, idType any) any
+	VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any
 
 	BeginPermission(name string)
 	VisitPermission(name string, body any) any

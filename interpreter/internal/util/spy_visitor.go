@@ -30,28 +30,28 @@ type node map[string]any
 
 func (v *SpyVisitor) BeginType(name string) {}
 
-func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any, commonRelations []any, reporterRelations []any) error {
+func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonMembers *output.Members, reporterMembers *output.Members) error {
 	entry, exists := v.root[typeName].(node)
 	if !exists {
-		entry = node{"common": nil, "reporters": node{}}
+		entry = createNode(map[string]any{"common": nil, "reporters": node{}})
 		v.root[typeName] = entry
 	}
-	if commonFields != nil && entry["common"] == nil {
-		entry["common"] = node{"fields": commonFields, "relations": commonRelations}
+	if commonMembers != nil && entry["common"] == nil {
+		entry["common"] = createNode(map[string]any{"fields": commonMembers.DataFields, "relations": commonMembers.RelationFields, "permissions": commonMembers.Permissions})
 	}
 	if reporter != "" {
 		reporters := entry["reporters"].(node)
 		if _, dup := reporters[reporter]; dup {
 			return fmt.Errorf("resource %s: reporter '%s' registered more than once", typeName, reporter)
 		}
-		reporters[reporter] = node{"fields": reporterFields, "relations": reporterRelations}
+		reporters[reporter] = createNode(map[string]any{"fields": reporterMembers.DataFields, "relations": reporterMembers.RelationFields, "permissions": reporterMembers.Permissions})
 	}
 
 	return nil
 }
 
 func (v *SpyVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {
-	result := node{"name": name, "required": required, "type": dataType}
+	result := createNode(map[string]any{"name": name, "required": required, "type": dataType})
 	if description != nil {
 		result["description"] = *description
 	}
@@ -59,76 +59,110 @@ func (v *SpyVisitor) VisitDataField(name string, required bool, description *str
 }
 
 func (v *SpyVisitor) VisitTextDataType(minLength *int, maxLength *int, regex *string) any {
-	return node{"kind": "text", "minLength": minLength, "maxLength": maxLength, "regex": regex}
+	return createNode(map[string]any{"kind": "text", "minLength": minLength, "maxLength": maxLength, "regex": regex})
 }
 
 func (v *SpyVisitor) VisitUUIDDataType() any {
-	return node{"kind": "uuid"}
+	return createNode(map[string]any{"kind": "uuid"})
 }
 
 func (v *SpyVisitor) VisitNumericIDDataType(min *int, max *int) any {
-	return node{"kind": "numeric_id", "min": min, "max": max}
+	return createNode(map[string]any{"kind": "numeric_id", "min": min, "max": max})
 }
 
 func (v *SpyVisitor) VisitBooleanDataType() any {
-	return node{"kind": "boolean"}
+	return createNode(map[string]any{"kind": "boolean"})
 }
 
 func (v *SpyVisitor) VisitDateTimeDataType() any {
-	return node{"kind": "date_time"}
+	return createNode(map[string]any{"kind": "date_time"})
 }
 
 func (v *SpyVisitor) VisitEnumDataType(values []string) any {
-	return node{"kind": "enum", "values": values}
+	return createNode(map[string]any{"kind": "enum", "values": values})
 }
 
 func (v *SpyVisitor) VisitNullableDataType(inner any) any {
-	return node{"kind": "nullable", "inner": inner}
+	return createNode(map[string]any{"kind": "nullable", "inner": inner})
 }
 
 func (v *SpyVisitor) VisitCompositeDataType(dataTypes []any) any {
-	return node{"kind": "composite", "types": dataTypes}
+	return createNode(map[string]any{"kind": "composite", "types": dataTypes})
 }
 
 func (v *SpyVisitor) VisitArrayDataType(items any) any {
-	return node{"kind": "array", "items": items}
+	return createNode(map[string]any{"kind": "array", "items": items})
 }
 
 func (v *SpyVisitor) VisitObjectDataType(properties []any, required []string) any { //TODO: the individual properties know if they're required, so why do we capture it separately? Also, what about field names?
-	return node{"kind": "object", "properties": properties, "required": required}
+	return createNode(map[string]any{"kind": "object", "properties": properties, "required": required})
 }
 
 func (v *SpyVisitor) VisitAnd(left any, right any) any {
-	return node{"kind": "and", "left": left, "right": right}
+	return createNode(map[string]any{"kind": "and", "left": left, "right": right})
 }
 
 func (v *SpyVisitor) VisitOr(left any, right any) any {
-	return node{"kind": "or", "left": left, "right": right}
+	return createNode(map[string]any{"kind": "or", "left": left, "right": right})
 }
 
 func (v *SpyVisitor) VisitUnless(left any, right any) any {
-	return node{"kind": "unless", "left": left, "right": right}
+	return createNode(map[string]any{"kind": "unless", "left": left, "right": right})
 }
 
 func (v *SpyVisitor) VisitReferenceExpression(name string) any {
-	return node{"kind": "reference", "name": name}
+	return createNode(map[string]any{"kind": "reference", "name": name})
 }
 
 func (v *SpyVisitor) VisitSubReferenceExpression(name string, sub string) any {
-	return node{"kind": "subreference", "name": name, "sub": sub}
+	return createNode(map[string]any{"kind": "subreference", "name": name, "sub": sub})
 }
 
-func (v *SpyVisitor) VisitRelation(reporter string, typeName string, cardinality string, dataType any) any {
-	return node{"kind": "relation", "reporter": reporter, "typeName": typeName, "cardinality": cardinality, "dataType": dataType}
+func (v *SpyVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, dataType any) any {
+	return createNode(map[string]any{"kind": "relation", "name": name, "reporter": reporter, "typeName": typeName, "cardinality": cardinality, "dataType": dataType})
 }
 
 func (v *SpyVisitor) BeginPermission(name string) {
 
 }
 
+func createNode(data map[string]any) node {
+	result := node{}
+	for key, value := range data {
+		// Skip nil, empty slices, and empty maps, and nil string/int pointers
+		switch v := value.(type) {
+		case nil:
+			continue
+		case []any:
+			if len(v) == 0 {
+				continue
+			}
+		case map[string]any:
+			if len(v) == 0 {
+				continue
+			}
+		case *string:
+			if v == nil {
+				continue
+			}
+		case *int:
+			if v == nil {
+				continue
+			}
+		case *bool:
+			if v == nil {
+				continue
+			}
+		}
+
+		result[key] = value
+	}
+	return result
+}
+
 // Construct relation expression
 func (v *SpyVisitor) VisitPermission(name string, body any) any {
-	return node{"kind": "relation", "name": name, "body": body}
+	return createNode(map[string]any{"kind": "relation", "name": name, "body": body})
 }
 
 func (v *SpyVisitor) Results() ([]output.OutputEntry, error) {

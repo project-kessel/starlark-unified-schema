@@ -21,21 +21,21 @@ func NewJSONSchemaVisitor() *JSONSchemaVisitor {
 
 func (v *JSONSchemaVisitor) BeginType(name string) {}
 
-func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonFields []any, reporterFields []any, commonRelations []any, reporterRelations []any) error {
+func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members) error {
 	entry, exists := v.root[typeName].(node)
 	if !exists {
 		entry = node{"common": nil, "reporters": node{}}
 		v.root[typeName] = entry
 	}
-	if commonFields != nil && entry["common"] == nil {
-		entry["common"] = commonFields
+	if commonMembers != nil && entry["common"] == nil {
+		entry["common"] = commonMembers.DataFields
 	}
 	if reporter != "" {
 		reporters := entry["reporters"].(node)
 		if _, dup := reporters[reporter]; dup {
 			return fmt.Errorf("resource %s: reporter '%s' registered more than once", typeName, reporter)
 		}
-		reporters[reporter] = reporterFields
+		reporters[reporter] = reporterMembers.DataFields
 	}
 	return nil
 }

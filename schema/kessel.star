@@ -79,6 +79,7 @@ def _make_subref(parent_name, child_name):
     subref.exclude = exclude
     return subref
 
+# Between this function and _create_proxy, the proxies are probably incomplete, but that's something to come back to when tests run.
 def _extract_relation_and_permission_types(resource):
     """Returns dict of {relation_name: target_type(s)} for cross-type relations."""
     relation_types = {}
@@ -108,8 +109,6 @@ def _create_proxy(common, fields):
         field = combined_fields[field_name]
         if field_name in fields_types:
             proxy_fields[field_name] = _make_ref(field_name, fields_types[field_name])
-        else:
-            proxy_fields[field_name] = field
 
     return struct(kind="proxy", **proxy_fields)
 
@@ -117,7 +116,8 @@ def _process_permissions(common, object, permissions):
     proxy = _create_proxy(common, object)
     for permission_name in permissions:
         factory = permissions[permission_name]
-        object[permission_name] = factory(proxy)
+        body = factory(proxy)
+        object[permission_name] = struct(kind="permission", body=body)
     return object
 
 def resource(reporter, id_type, common={}, fields={}, permissions={}):
@@ -162,15 +162,10 @@ def self():
         "kind": "selfType"
     }
 
-def _createRelation(kind, type):
-    relation = {
-        "kind": kind,
-        "type": type,
-    }
-
-    # Create a struct with both data fields and methods
+def _createRelation(cardinality, type):
     return struct(
-        kind=kind,
+        kind="relation",
+        cardinality=cardinality,
         type=type,
     )
 
