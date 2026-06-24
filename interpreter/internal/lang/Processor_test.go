@@ -332,6 +332,41 @@ fields={
 }`)
 }
 
+func TestPermissionCallingPermission(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/permission_calling_permission.star", []byte(`
+load("kessel.star", "self", "atMostOne", "resource", "uuid")
+this_resource = resource("test", id_type=uuid(), 
+fields={
+	"relation": atMostOne(self())
+}, permissions={
+	"inner": lambda r: r.relation,
+	"outer": lambda r: r.inner,
+})`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+	"this_resource": {
+		"common": {},
+		"reporters": {
+			"test": {
+				"relations": [
+					{"kind": "relation", "name": "relation", "cardinality": "AtMostOne", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"}
+				],
+				"permissions": [
+					{"kind": "permission", "name": "inner", "body": {"kind": "reference", "name": "relation"}},
+					{"kind": "permission", "name": "outer", "body": {"kind": "reference", "name": "inner"}}
+				]
+			}
+		}
+	}
+}`)
+}
+
 func TestSubRefPermissionAcrossTypes(t *testing.T) {
 	reader := newInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)

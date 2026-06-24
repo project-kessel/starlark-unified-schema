@@ -59,7 +59,7 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 
 	globals, err := starlark.ExecFileOptions(l.opts, thread, name, contents, l.predeclared)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error executing file %s: %w", name, err)
 	}
 
 	err = l.recordMetadata(globals)

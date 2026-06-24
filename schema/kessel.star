@@ -103,7 +103,7 @@ def _create_proxy(common, fields, permission_names):
         proxy_fields[field_name] = _make_ref(field_name, _get_relation_names(self_names, fields_types[field_name]))
 
     for permission_name in permission_names:
-        proxy_fields[permission_name] = None
+        proxy_fields[permission_name] = _make_ref(permission_name, [])
 
     return struct(kind="proxy", **proxy_fields)
 
