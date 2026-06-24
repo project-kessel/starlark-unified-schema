@@ -74,7 +74,7 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 		if err != nil {
 			return fmt.Errorf("error getting common members of %s: %w", varName, err)
 		}
-		commonMembers, err = p.visitMembers(commonDict, visitor)
+		commonMembers, err = p.visitMembers(nil, commonDict, visitor)
 		if err != nil {
 			return fmt.Errorf("error visiting common members of %s: %w", varName, err)
 		}
@@ -85,7 +85,7 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 			if err != nil {
 				return fmt.Errorf("error getting reporter %s fields of %s: %w", reporter, varName, err)
 			}
-			reporterMembers, err = p.visitMembers(fieldsDict, visitor)
+			reporterMembers, err = p.visitMembers(s, fieldsDict, visitor)
 			if err != nil {
 				return fmt.Errorf("error visiting reporter %s fields of %s: %w", reporter, varName, err)
 			}
@@ -99,7 +99,7 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 	return nil
 }
 
-func (p *Processor) visitMembers(fields *starlark.Dict, visitor output.SchemaVisitor) (*output.Members, error) {
+func (p *Processor) visitMembers(self *starlarkstruct.Struct, fields *starlark.Dict, visitor output.SchemaVisitor) (*output.Members, error) {
 	var dataFields []any
 	var relationFields []any
 	var permissions []any
@@ -150,7 +150,10 @@ func (p *Processor) visitMembers(fields *starlark.Dict, visitor output.SchemaVis
 			if err != nil {
 				return nil, fmt.Errorf("error getting type for relation %s: %w", fieldName, err)
 			}
-
+			typeStruct, err = resolveResourceTypeReference(self, typeStruct)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving resource type reference for relation %s: %w", fieldName, err)
+			}
 			metadata, ok := p.metadata[typeStruct]
 			if !ok {
 				return nil, fmt.Errorf("metadata not found for type %s", typeStruct)
@@ -181,6 +184,22 @@ func (p *Processor) visitMembers(fields *starlark.Dict, visitor output.SchemaVis
 		RelationFields: relationFields,
 		Permissions:    permissions,
 	}, nil
+}
+
+func resolveResourceTypeReference(self *starlarkstruct.Struct, typeStruct *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {
+	kind, err := getStringAttr("kind", typeStruct)
+	if err != nil {
+		return nil, fmt.Errorf("error getting kind for resource type reference: %w", err)
+	}
+
+	switch kind {
+	case "self":
+		return self, nil
+	case "resource":
+		return typeStruct, nil
+	default:
+		return nil, fmt.Errorf("unmatched resource type reference kind: %s", kind)
+	}
 }
 
 func visitPermissionBody(v starlark.Value, visitor output.SchemaVisitor) (any, error) {

@@ -162,7 +162,7 @@ func createNode(data map[string]any) node {
 
 // Construct relation expression
 func (v *SpyVisitor) VisitPermission(name string, body any) any {
-	return createNode(map[string]any{"kind": "relation", "name": name, "body": body})
+	return createNode(map[string]any{"kind": "permission", "name": name, "body": body})
 }
 
 func (v *SpyVisitor) Results() ([]output.OutputEntry, error) {
