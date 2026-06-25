@@ -67,6 +67,7 @@ func createOutputConfigs() []OutputConfig {
 	}
 
 	addConfig("JSONSCHEMA_OUTPUT_DIR", output.NewJSONSchemaVisitor())
+	addConfig("KSL_OUTPUT_DIR", output.NewKSILVisitor())
 
 	return configs
 }

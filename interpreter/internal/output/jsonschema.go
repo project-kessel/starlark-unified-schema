@@ -28,14 +28,20 @@ func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, comm
 		v.root[typeName] = entry
 	}
 	if commonMembers != nil && entry["common"] == nil {
-		entry["common"] = commonMembers.DataFields
+		common := []any{}
+		common = append(common, commonMembers.DataFields...)
+		common = append(common, commonMembers.RelationFields...)
+		entry["common"] = common
 	}
 	if reporter != "" {
 		reporters := entry["reporters"].(node)
 		if _, dup := reporters[reporter]; dup {
 			return fmt.Errorf("resource %s: reporter '%s' registered more than once", typeName, reporter)
 		}
-		reporters[reporter] = reporterMembers.DataFields
+		reporterData := []any{}
+		reporterData = append(reporterData, reporterMembers.DataFields...)
+		reporterData = append(reporterData, reporterMembers.RelationFields...)
+		reporters[reporter] = reporterData
 	}
 	return nil
 }
@@ -189,24 +195,15 @@ func (v *JSONSchemaVisitor) VisitObjectDataType(properties []any, required []str
 }
 
 func (v *JSONSchemaVisitor) VisitAnd(left any, right any) any {
-	if left != nil {
-		return left
-	}
-	return right
+	return nil
 }
 
 func (v *JSONSchemaVisitor) VisitOr(left any, right any) any {
-	if left != nil {
-		return left
-	}
-	return right
+	return nil
 }
 
 func (v *JSONSchemaVisitor) VisitUnless(left any, right any) any {
-	if left != nil {
-		return left
-	}
-	return right
+	return nil
 }
 
 func (v *JSONSchemaVisitor) VisitReferenceExpression(name string) any {
@@ -217,16 +214,32 @@ func (v *JSONSchemaVisitor) VisitSubReferenceExpression(name string, sub string)
 	return nil
 }
 
-func (v *JSONSchemaVisitor) VisitRelation(reporter string, typeName string, cardinality string, dataType any) any {
-	panic("not implemented") // TODO: return a data field of the id type of the indicated resource type ... which we need to find
-	// Also, it might be smart to change the name of this vs the ones called from permissions. We actually might not need to implement the permission ones at all.
+func (v *JSONSchemaVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any {
+	switch cardinality {
+	case "AtMostOne":
+		return v.VisitDataField(name, false, nil, idType)
+	case "ExactlyOne":
+		return v.VisitDataField(name, true, nil, idType)
+	case "AtLeastOne":
+		arrayType := v.VisitArrayDataType(idType)
+		return v.VisitDataField(name, true, nil, arrayType)
+	case "Many":
+		arrayType := v.VisitArrayDataType(idType)
+		return v.VisitDataField(name, false, nil, arrayType)
+	case "All":
+		wildcardType := v.VisitTextDataType(nil, nil, stringPtr("^*$"))
+		return v.VisitDataField(name, false, nil, wildcardType)
+	}
+	return nil
 }
 
-func (v *JSONSchemaVisitor) BeginPermission(name string) {
-
+func stringPtr(s string) *string {
+	return &s
 }
+
+func (v *JSONSchemaVisitor) BeginPermission(name string) {}
 
 // Construct relation expression
 func (v *JSONSchemaVisitor) VisitPermission(name string, body any) any {
-	panic("not implemented") // TODO: Implement
+	return nil // TODO: Implement
 }

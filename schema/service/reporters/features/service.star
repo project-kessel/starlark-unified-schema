@@ -1,4 +1,4 @@
-load("kessel.star", "resource", "field", "uuid", "permissions", "many", "atMostOne", "self", "any")
+load("kessel.star", "resource", "field", "uuid", "many", "atMostOne", "self", "any")
 load("workspace/reporters/rbac/workspace.star", "workspace")
 load("billing_account/reporters/features/billing_account.star", "billing_account")
 
