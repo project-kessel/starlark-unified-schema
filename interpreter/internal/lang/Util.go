@@ -82,11 +82,16 @@ func isResource(obj *starlarkstruct.Struct) (bool, error) {
 	if !slices.Contains(attrNames, "kind") {
 		return false, nil
 	}
-	kind, err := getStringAttr("kind", obj)
+	v, err := obj.Attr("kind")
 	if err != nil {
-		return false, fmt.Errorf("error getting kind for %+v: %w", obj, err)
+		return false, fmt.Errorf("error accessing member kind of struct %+v: %w", obj, err)
 	}
-	return kind == "resource", nil
+	kind, ok := v.(starlark.String)
+	if !ok {
+		return false, nil
+	}
+	return string(kind) == "resource", nil
+}
 }
 
 func getStructAttr(name string, s *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {
