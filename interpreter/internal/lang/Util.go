@@ -2,6 +2,7 @@ package lang
 
 import (
 	"fmt"
+	"slices"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
@@ -74,6 +75,18 @@ func getStringAttr(name string, s *starlarkstruct.Struct) (string, error) {
 		return "", fmt.Errorf("expected string for %s, got %s", name, v.Type())
 	}
 	return string(str), nil
+}
+
+func isResource(obj *starlarkstruct.Struct) (bool, error) {
+	attrNames := obj.AttrNames()
+	if !slices.Contains(attrNames, "kind") {
+		return false, nil
+	}
+	kind, err := getStringAttr("kind", obj)
+	if err != nil {
+		return false, fmt.Errorf("error getting kind for %+v: %w", obj, err)
+	}
+	return kind == "resource", nil
 }
 
 func getStructAttr(name string, s *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {

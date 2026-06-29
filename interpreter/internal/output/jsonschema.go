@@ -227,7 +227,7 @@ func (v *JSONSchemaVisitor) VisitRelation(name string, reporter string, typeName
 		arrayType := v.VisitArrayDataType(idType)
 		return v.VisitDataField(name, false, nil, arrayType)
 	case "All":
-		wildcardType := v.VisitTextDataType(nil, nil, stringPtr("^*$"))
+		wildcardType := v.VisitTextDataType(nil, nil, stringPtr("^\\*$"))
 		return v.VisitDataField(name, false, nil, wildcardType)
 	}
 	return nil

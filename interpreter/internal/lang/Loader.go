@@ -34,7 +34,7 @@ func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 		predeclared:  starlark.StringDict{},
 		module_names: nil,
 		reader:       reader,
-		metadata:     map[resourceType]meta{},
+		metadata:     nil,
 	}
 
 	registerDefaultBuiltins(l)
@@ -79,6 +79,15 @@ func (l *Loader) recordMetadata(globals starlark.StringDict) error {
 
 	for typeName, value := range globals {
 		if obj, ok := value.(*starlarkstruct.Struct); ok {
+
+			isResource, err := isResource(obj)
+			if err != nil {
+				return fmt.Errorf("error checking if %s is a resource: %w", typeName, err)
+			}
+			if !isResource {
+				continue
+			}
+
 			idType, err := getStructAttr("id_type", obj)
 			if err != nil {
 				return fmt.Errorf("error getting id type for %s: %w", typeName, err)

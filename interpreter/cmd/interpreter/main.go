@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
@@ -25,7 +26,20 @@ func main() {
 	loader := lang.NewLoader(*srcDir)
 	processor := lang.NewProcessor(loader)
 
-	outputConfigs := createOutputConfigs()
+	directoryToVisitorMappings := map[string]output.SchemaVisitor{
+		"JSONSCHEMA_OUTPUT_DIR": output.NewJSONSchemaVisitor(),
+		"KSL_OUTPUT_DIR":        output.NewKSILVisitor(),
+	}
+	outputConfigs := createOutputConfigs(directoryToVisitorMappings)
+	if len(outputConfigs) == 0 {
+		keys := make([]string, 0, len(directoryToVisitorMappings))
+		for key := range directoryToVisitorMappings {
+			keys = append(keys, key)
+		}
+		fmt.Fprintln(os.Stderr, "No output configured. Set one or more of the following environment variables:", strings.Join(keys, ", "))
+		os.Exit(1)
+	}
+
 	inputFiles := flag.Args()
 
 	for _, config := range outputConfigs {
@@ -53,21 +67,19 @@ func processVisitorAndWriteOutputs(processor *lang.Processor, config OutputConfi
 	return nil
 }
 
-func createOutputConfigs() []OutputConfig {
+func createOutputConfigs(mappings map[string]output.SchemaVisitor) []OutputConfig {
 	configs := []OutputConfig{}
-	addConfig := func(varName string, visitor output.SchemaVisitor) {
+
+	for varName, visitor := range mappings {
 		path := os.Getenv(varName)
 		if path == "" {
-			return
+			continue
 		}
 		configs = append(configs, OutputConfig{
 			Path:    path,
 			Visitor: visitor,
 		})
 	}
-
-	addConfig("JSONSCHEMA_OUTPUT_DIR", output.NewJSONSchemaVisitor())
-	addConfig("KSL_OUTPUT_DIR", output.NewKSILVisitor())
 
 	return configs
 }

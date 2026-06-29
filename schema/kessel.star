@@ -109,15 +109,21 @@ def _create_proxy(common, fields, permission_names):
 
 def _process_permissions(common, object, permissions):
     proxy = _create_proxy(common, object, permissions.keys())
+    combined_fields = {}
+
+    for field_name in object:
+        combined_fields[field_name] = object[field_name]
+
     for permission_name in permissions:
         factory = permissions[permission_name]
         body = factory(proxy)
-        object[permission_name] = struct(kind="permission", body=body)
-    return object
+        combined_fields[permission_name] = struct(kind="permission", body=body)
+
+    return combined_fields
 
 def resource(reporter, id_type, common={}, fields={}, permissions={}):
-    _process_permissions(common, fields, permissions)
-    return struct(kind="resource", reporter=reporter, id_type=id_type, common=common, fields=fields)
+    combined_fields = _process_permissions(common, fields, permissions)
+    return struct(kind="resource", reporter=reporter, id_type=id_type, common=common, fields=combined_fields)
 
 def text(minLength=None, maxLength=None, regex=None):
     return struct(kind="text", minLength=minLength, maxLength=maxLength, regex=regex)
@@ -155,7 +161,7 @@ def field(type, required=False, description=None):
 def self():
     return struct(kind="self")
 
-def _createRelation(cardinality, type):
+def _create_relation(cardinality, type):
     return struct(
         kind="relation",
         cardinality=cardinality,
@@ -163,25 +169,22 @@ def _createRelation(cardinality, type):
     )
 
 def wildcard(type):
-    return _createRelation("All", type)
+    return _create_relation("All", type)
 
-def atMostOne(type):
-    return _createRelation("AtMostOne", type)
+def at_most_one(type):
+    return _create_relation("AtMostOne", type)
 
 def one(type):
-    return _createRelation("ExactlyOne", type)
+    return _create_relation("ExactlyOne", type)
 
-def atLeastOne(type):
-    return _createRelation("AtLeastOne", type)
+def at_least_one(type):
+    return _create_relation("AtLeastOne", type)
 
 def many(type):
-    return _createRelation("Many", type)
+    return _create_relation("Many", type)
 
-def anyOf(*types):
-    return {
-        "kind": "typeUnion",
-        "types": list(types)
-    }
+def any_of(*types):
+    return struct(kind="typeUnion", types=list(types))
 
 def any(root, *refs):
     for ref in refs:

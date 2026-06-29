@@ -1,4 +1,4 @@
-load("kessel.star", "resource", "field", "uuid", "many", "atMostOne", "self", "any")
+load("kessel.star", "resource", "uuid", "many", "at_most_one", "self", "any")
 load("workspace/reporters/rbac/workspace.star", "workspace")
 load("billing_account/reporters/features/billing_account.star", "billing_account")
 
@@ -7,7 +7,7 @@ id_type=uuid(),
 fields={
     "allowed_workspaces": many(workspace),
     "billing_account": many(billing_account),
-    "parent": atMostOne(self())
+    "parent": at_most_one(self())
 },
 permissions={ 
     "does_workspace_have_service_preference": lambda s: any(

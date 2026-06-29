@@ -1,8 +1,8 @@
-load ("kessel.star", "resource", "atMostOne", "many", "self", "uuid")
+load ("kessel.star", "resource", "at_most_one", "many", "self", "uuid")
 
 workspace = resource (reporter="rbac", id_type=uuid(), 
 fields={
-    "parent": atMostOne(self()),
+    "parent": at_most_one(self()),
     "children": many(self())
 },
 permissions={

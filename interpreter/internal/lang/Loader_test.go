@@ -78,7 +78,24 @@ spy(message)`))
 	assert.NoError(t, err)
 
 	assert.ElementsMatch(t, []string{"hello"}, values)
+}
 
+func TestLoaderWithNonResourceStruct(t *testing.T) {
+	loader, reader, thread := createDefaultLoaderReaderAndThread()
+	reader.AddFile("hello.star", []byte(`
+banana = struct(
+	message = "hello"
+)
+`))
+
+	metadata := map[resourceType]meta{}
+	loader.SetMetadata(metadata)
+
+	_, err := loader.Load(thread, "hello.star")
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Len(t, metadata, 0)
 }
 
 func createDefaultLoaderReaderAndThread() (*Loader, *inmemorySourceFileReader, *starlark.Thread) {

@@ -200,11 +200,11 @@ func TestAssignableResourceReference(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/assignable_resource_reference.star", []byte(`
-load("kessel.star", "atMostOne", "resource", "uuid")
+load("kessel.star", "at_most_one", "resource", "uuid")
 other = resource("test", id_type=uuid())
 
 this_resource = resource("test", id_type=uuid(), fields={
-	"other": atMostOne(other)
+	"other": at_most_one(other)
 	})
 `))
 
@@ -236,10 +236,10 @@ func TestAssignableSelfReference(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/assignable_self_reference.star", []byte(`
-load("kessel.star", "atMostOne", "self", "resource", "uuid")
+load("kessel.star", "at_most_one", "self", "resource", "uuid")
 
 this_resource = resource("test", id_type=uuid(), fields={
-	"parent": atMostOne(self())
+	"parent": at_most_one(self())
 	})
 `))
 
@@ -337,10 +337,10 @@ func TestPermissionCallingPermission(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/permission_calling_permission.star", []byte(`
-load("kessel.star", "self", "atMostOne", "resource", "uuid")
+load("kessel.star", "self", "at_most_one", "resource", "uuid")
 this_resource = resource("test", id_type=uuid(), 
 fields={
-	"relation": atMostOne(self())
+	"relation": at_most_one(self())
 }, permissions={
 	"inner": lambda r: r.relation,
 	"outer": lambda r: r.inner,
@@ -372,13 +372,13 @@ func TestSubRefPermissionAcrossTypes(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/subref_permission_across_types.star", []byte(`
-load("kessel.star", "self", "wildcard", "resource", "uuid", "atMostOne")
+load("kessel.star", "self", "wildcard", "resource", "uuid", "at_most_one")
 container = resource("test", id_type=uuid(), fields={
 	"flag": wildcard(self())
 })
 
 this_resource = resource("test", id_type=uuid(), fields={
-	"container": atMostOne(container)
+	"container": at_most_one(container)
 }, permissions={
 	"permission": lambda r: r.container.flag
 })`))
@@ -418,9 +418,9 @@ func TestRecursivePermission(t *testing.T) {
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/recursive_permission.star", []byte(`
-load("kessel.star", "self", "wildcard", "resource", "uuid", "atMostOne")
+load("kessel.star", "self", "wildcard", "resource", "uuid", "at_most_one")
 this_resource = resource("test", id_type=uuid(), fields={
-	"parent": atMostOne(self()),
+	"parent": at_most_one(self()),
 	"flag": wildcard(self())
 }, permissions={
 	"permission": lambda r: r.flag.union(r.parent.permission)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type OutputEntry struct {
@@ -13,7 +14,11 @@ type OutputEntry struct {
 
 func WriteSchemas(outputDir string, entries []OutputEntry) error {
 	for _, entry := range entries {
-		fullPath := filepath.Join(outputDir, entry.Path)
+		cleanPath := filepath.Clean(entry.Path)
+		if filepath.IsAbs(cleanPath) || cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("refusing to write outside output dir: %s", entry.Path)
+		}
+		fullPath := filepath.Join(outputDir, cleanPath)
 
 		dir := filepath.Dir(fullPath)
 		if err := os.MkdirAll(dir, 0755); err != nil {

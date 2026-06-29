@@ -57,14 +57,21 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 		if !ok {
 			continue
 		}
-		kind, err := getStringAttr("kind", s)
-		if err != nil || kind != "resource" {
+		isResource, err := isResource(s)
+		if err != nil {
+			return fmt.Errorf("error checking if %s is a resource: %w", varName, err)
+		}
+		if !isResource {
 			continue
 		}
 
 		reporter, err := getStringAttr("reporter", s)
 		if err != nil {
 			return fmt.Errorf("resource %s: %w", varName, err)
+		}
+
+		if reporter == "" {
+			return fmt.Errorf("resource %s: reporter is required", varName)
 		}
 
 		visitor.BeginType(varName)
@@ -194,6 +201,9 @@ func resolveResourceTypeReference(self *starlarkstruct.Struct, typeStruct *starl
 
 	switch kind {
 	case "self":
+		if self == nil {
+			return nil, fmt.Errorf("self reference found but no self context available - is this a common representation?")
+		}
 		return self, nil
 	case "resource":
 		return typeStruct, nil
