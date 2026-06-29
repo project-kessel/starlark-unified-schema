@@ -92,7 +92,6 @@ func isResource(obj *starlarkstruct.Struct) (bool, error) {
 	}
 	return string(kind) == "resource", nil
 }
-}
 
 func getStructAttr(name string, s *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {
 	v, err := s.Attr(name)
