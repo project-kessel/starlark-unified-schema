@@ -10,7 +10,7 @@ test:
 	go test -C ./interpreter/ -count=1 ./...
 
 build-schema: build-interpreter
-	./bin/interpreter
+	dotenv -f .env run ./bin/interpreter
 
 clean:
 	rm -rf bin/
