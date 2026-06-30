@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
@@ -11,7 +12,6 @@ import (
 
 func main() {
 	srcDir := flag.String("src", "schema", "path to the directory containing Starlark schema (.star) files")
-	outputDir := flag.String("output-dir", "output", "directory to write generated artifacts")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [file ...]\n\n", os.Args[0])
@@ -26,21 +26,65 @@ func main() {
 	loader := lang.NewLoader(*srcDir)
 	processor := lang.NewProcessor(loader)
 
-	jsonSchemaVisitor := output.NewJSONSchemaVisitor()
-	if err := processor.Process(jsonSchemaVisitor, flag.Args()...); err != nil {
-		fmt.Fprintf(os.Stderr, "Error processing schema: %v\n", err)
+	directoryToVisitorMappings := map[string]output.SchemaVisitor{
+		"JSONSCHEMA_OUTPUT_DIR": output.NewJSONSchemaVisitor(),
+		"KSL_OUTPUT_DIR":        output.NewKSILVisitor(),
+	}
+	outputConfigs := createOutputConfigs(directoryToVisitorMappings)
+	if len(outputConfigs) == 0 {
+		keys := make([]string, 0, len(directoryToVisitorMappings))
+		for key := range directoryToVisitorMappings {
+			keys = append(keys, key)
+		}
+		fmt.Fprintln(os.Stderr, "No output configured. Set one or more of the following environment variables:", strings.Join(keys, ", "))
 		os.Exit(1)
 	}
 
-	results := jsonSchemaVisitor.Results()
-	if len(results) == 0 {
-		fmt.Println("No schemas generated.")
-		return
+	inputFiles := flag.Args()
+
+	for _, config := range outputConfigs {
+		if err := processVisitorAndWriteOutputs(processor, config, inputFiles); err != nil {
+			fmt.Fprintf(os.Stderr, "Error processing visitor and writing outputs: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
+func processVisitorAndWriteOutputs(processor *lang.Processor, config OutputConfig, files []string) error {
+	if err := processor.Process(config.Visitor, files...); err != nil {
+		return fmt.Errorf("error processing visitor: %w", err)
 	}
 
-	fmt.Printf("Writing schemas to %s/\n", *outputDir)
-	if err := output.WriteSchemas(*outputDir, results); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing schemas: %v\n", err)
-		os.Exit(1)
+	results, err := config.Visitor.Results()
+	if err != nil {
+		return fmt.Errorf("error getting results from visitor: %w", err)
 	}
+
+	if err := output.WriteSchemas(config.Path, results); err != nil {
+		return fmt.Errorf("error writing schemas to %s: %w", config.Path, err)
+	}
+
+	return nil
+}
+
+func createOutputConfigs(mappings map[string]output.SchemaVisitor) []OutputConfig {
+	configs := []OutputConfig{}
+
+	for varName, visitor := range mappings {
+		path := os.Getenv(varName)
+		if path == "" {
+			continue
+		}
+		configs = append(configs, OutputConfig{
+			Path:    path,
+			Visitor: visitor,
+		})
+	}
+
+	return configs
+}
+
+type OutputConfig struct {
+	Path    string
+	Visitor output.SchemaVisitor
 }

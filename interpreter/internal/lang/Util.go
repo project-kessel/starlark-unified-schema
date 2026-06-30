@@ -2,6 +2,7 @@ package lang
 
 import (
 	"fmt"
+	"slices"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
@@ -74,6 +75,44 @@ func getStringAttr(name string, s *starlarkstruct.Struct) (string, error) {
 		return "", fmt.Errorf("expected string for %s, got %s", name, v.Type())
 	}
 	return string(str), nil
+}
+
+func isResource(obj *starlarkstruct.Struct) (bool, error) {
+	attrNames := obj.AttrNames()
+	if !slices.Contains(attrNames, "kind") {
+		return false, nil
+	}
+	v, err := obj.Attr("kind")
+	if err != nil {
+		return false, fmt.Errorf("error accessing member kind of struct %+v: %w", obj, err)
+	}
+	kind, ok := v.(starlark.String)
+	if !ok {
+		return false, nil
+	}
+	return string(kind) == "resource", nil
+}
+
+func getStructAttr(name string, s *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {
+	v, err := s.Attr(name)
+	if err != nil {
+		return nil, fmt.Errorf("error accessing member %s of struct %+v: %w", name, s, err)
+	}
+	if structValue, ok := v.(*starlarkstruct.Struct); ok {
+		return structValue, nil
+	}
+	return nil, fmt.Errorf("expected struct for %s, got %s", name, v.Type())
+}
+
+func getDictAttr(name string, s *starlarkstruct.Struct) (*starlark.Dict, error) {
+	v, err := s.Attr(name)
+	if err != nil {
+		return nil, fmt.Errorf("error accessing member %s of struct %+v: %w", name, s, err)
+	}
+	if dictValue, ok := v.(*starlark.Dict); ok {
+		return dictValue, nil
+	}
+	return nil, fmt.Errorf("expected dict for %s, got %s", name, v.Type())
 }
 
 func getBoolAttr(name string, s *starlarkstruct.Struct) (bool, error) {

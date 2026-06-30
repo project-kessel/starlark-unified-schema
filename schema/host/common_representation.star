@@ -1,5 +1,6 @@
-load("kessel.star", "field", "text")
+load("kessel.star", "field", "text", "one")
+load("workspace/reporters/rbac/workspace.star", "workspace")
 
 host = {
-    "workspace_id": field(type=text(), required=True),
+    "workspace_id": one(workspace)
 }

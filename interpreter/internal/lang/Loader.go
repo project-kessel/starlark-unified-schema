@@ -1,12 +1,14 @@
 package lang
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"go.starlark.net/starlark"
+	"go.starlark.net/starlarkstruct"
 	"go.starlark.net/syntax"
 )
 
@@ -17,6 +19,7 @@ type Loader struct {
 	predeclared  starlark.StringDict
 	reader       sourceFileReader
 	module_names []string
+	metadata     map[resourceType]meta
 }
 
 func NewLoader(path string) *Loader {
@@ -31,11 +34,16 @@ func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 		predeclared:  starlark.StringDict{},
 		module_names: nil,
 		reader:       reader,
+		metadata:     nil,
 	}
 
 	registerDefaultBuiltins(l)
 
 	return l
+}
+
+func (l *Loader) SetMetadata(metadata map[resourceType]meta) {
+	l.metadata = metadata
 }
 
 func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict, error) {
@@ -51,12 +59,54 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 
 	globals, err := starlark.ExecFileOptions(l.opts, thread, name, contents, l.predeclared)
 	if err != nil {
+		return nil, fmt.Errorf("error executing file %s: %w", name, err)
+	}
+
+	err = l.recordMetadata(globals)
+	if err != nil {
 		return nil, err
 	}
 
 	l.modules[name] = globals
 
 	return globals, nil
+}
+
+func (l *Loader) recordMetadata(globals starlark.StringDict) error {
+	if l.metadata == nil {
+		return nil
+	}
+
+	for typeName, value := range globals {
+		if obj, ok := value.(*starlarkstruct.Struct); ok {
+
+			isResource, err := isResource(obj)
+			if err != nil {
+				return fmt.Errorf("error checking if %s is a resource: %w", typeName, err)
+			}
+			if !isResource {
+				continue
+			}
+
+			idType, err := getStructAttr("id_type", obj)
+			if err != nil {
+				return fmt.Errorf("error getting id type for %s: %w", typeName, err)
+			}
+
+			reporter, err := getStringAttr("reporter", obj)
+			if err != nil {
+				return fmt.Errorf("error getting reporter for %s: %w", typeName, err)
+			}
+
+			l.metadata[obj] = meta{
+				reporter: reporter,
+				typeName: typeName,
+				idType:   idType,
+			}
+		}
+	}
+
+	return nil
 }
 
 func (l *Loader) GetAllModuleNames() ([]string, error) {
@@ -161,7 +211,7 @@ func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
 func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
 	names := make([]string, 0, len(im.files))
 
-	for name, _ := range im.files {
+	for name := range im.files {
 		relative, err := filepath.Rel(path, name)
 		if err != nil {
 			return nil, err
@@ -175,4 +225,12 @@ func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
 	}
 
 	return names, nil
+}
+
+type resourceType *starlarkstruct.Struct
+
+type meta struct {
+	reporter string
+	typeName string
+	idType   *starlarkstruct.Struct
 }
