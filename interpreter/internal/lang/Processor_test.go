@@ -260,6 +260,199 @@ this_resource = resource("test", id_type=uuid(), fields={
 }`)
 }
 
+func TestPermissionLogicUnionIntersectExclude(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/relation_logic_union_intersect_exclude.star", []byte(`
+load("kessel.star", "self", "wildcard", "resource", "uuid")
+
+this_resource = resource("test", id_type=uuid(), fields={
+	"relation1": wildcard(self()),
+	"relation2": wildcard(self())
+}, permissions={
+	"union_perm": lambda r: r.relation1.union(r.relation2),
+	"intersect_perm": lambda r: r.relation1.intersect(r.relation2),
+	"exclude_perm": lambda r: r.relation1.exclude(r.relation2)
+})`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+	"this_resource": {
+		"common": {},
+		"reporters": {
+			"test": {
+				"relations": [
+					{"kind": "relation", "name": "relation1", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"},
+					{"kind": "relation", "name": "relation2", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"}
+				],
+				"permissions": [
+					{
+						"kind": "permission",
+						"name": "union_perm",
+						"body": {
+							"kind": "or",
+							"left": {"kind": "reference", "name": "relation1"},
+							"right": {"kind": "reference", "name": "relation2"}
+						}
+					},
+					{
+						"kind": "permission",
+						"name": "intersect_perm",
+						"body": {
+							"kind": "and",
+							"left": {"kind": "reference", "name": "relation1"},
+							"right": {"kind": "reference", "name": "relation2"}
+						}
+					},
+					{
+						"kind": "permission",
+						"name": "exclude_perm",
+						"body": {
+							"kind": "unless",
+							"left": {"kind": "reference", "name": "relation1"},
+							"right": {"kind": "reference", "name": "relation2"}
+						}
+					}
+				]
+			}
+		}
+	}
+}`)
+}
+
+func TestAnyPermission(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/any_permission.star", []byte(`
+load("kessel.star", "self", "wildcard", "resource", "uuid", "any")
+
+this_resource = resource("test", id_type=uuid(), fields={
+	"r1": wildcard(self()),
+	"r2": wildcard(self()),
+	"r3": wildcard(self())
+}, permissions={
+	"any_one": lambda r: any(r.r1),
+	"any_two": lambda r: any(r.r1, r.r2),
+	"any_three": lambda r: any(r.r1, r.r2, r.r3)
+})`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+	"this_resource": {
+		"common": {},
+		"reporters": {
+			"test": {
+				"relations": [
+					{"kind": "relation", "name": "r1", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"},
+					{"kind": "relation", "name": "r2", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"},
+					{"kind": "relation", "name": "r3", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"}
+				],
+				"permissions": [
+					{
+						"kind": "permission",
+						"name": "any_one",
+						"body": {"kind": "reference", "name": "r1"}
+					},
+					{
+						"kind": "permission",
+						"name": "any_two",
+						"body": {
+							"kind": "or",
+							"left": {"kind": "reference", "name": "r1"},
+							"right": {"kind": "reference", "name": "r2"}
+						}
+					},
+					{
+						"kind": "permission",
+						"name": "any_three",
+						"body": {
+							"kind": "or",
+							"left": {
+								"kind": "or",
+								"left": {"kind": "reference", "name": "r1"},
+								"right": {"kind": "reference", "name": "r2"}
+							},
+							"right": {"kind": "reference", "name": "r3"}
+						}
+					}
+				]
+			}
+		}
+	}
+}`)
+}
+
+func TestAllPermission(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/all_permission.star", []byte(`
+load("kessel.star", "self", "wildcard", "resource", "uuid", "all")
+
+this_resource = resource("test", id_type=uuid(), fields={
+	"r1": wildcard(self()),
+	"r2": wildcard(self()),
+	"r3": wildcard(self())
+}, permissions={
+	"all_one": lambda r: all(r.r1),
+	"all_two": lambda r: all(r.r1, r.r2),
+	"all_three": lambda r: all(r.r1, r.r2, r.r3)
+})`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+	"this_resource": {
+		"common": {},
+		"reporters": {
+			"test": {
+				"relations": [
+					{"kind": "relation", "name": "r1", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"},
+					{"kind": "relation", "name": "r2", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"},
+					{"kind": "relation", "name": "r3", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"}
+				],
+				"permissions": [
+					{
+						"kind": "permission",
+						"name": "all_one",
+						"body": {"kind": "reference", "name": "r1"}
+					},
+					{
+						"kind": "permission",
+						"name": "all_two",
+						"body": {
+							"kind": "and",
+							"left": {"kind": "reference", "name": "r1"},
+							"right": {"kind": "reference", "name": "r2"}
+						}
+					},
+					{
+						"kind": "permission",
+						"name": "all_three",
+						"body": {
+							"kind": "and",
+							"left": {
+								"kind": "and",
+								"left": {"kind": "reference", "name": "r1"},
+								"right": {"kind": "reference", "name": "r2"}
+							},
+							"right": {"kind": "reference", "name": "r3"}
+						}
+					}
+				]
+			}
+		}
+	}
+}`)
+}
+
 func TestPassthroughPermission(t *testing.T) {
 	reader := newInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
@@ -460,10 +653,16 @@ this_resource = resource("test", id_type=uuid(), fields={
 }`)
 }
 
+var loadedRealSchemaFiles = map[string][]byte{}
+
 func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {
+	if contents, ok := loadedRealSchemaFiles[path]; ok {
+		return reader.AddFile(path, contents)
+	}
 	contents, err := os.ReadFile(filepath.Join("../../../schema/", path))
 	if err != nil {
 		return err
 	}
+	loadedRealSchemaFiles[path] = contents
 	return reader.AddFile(path, contents)
 }
