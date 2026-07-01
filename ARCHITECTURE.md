@@ -21,41 +21,31 @@ This is a transitional step toward a single canonical schema model. Services can
 
 ### Unified Stack
 
-```mermaid
-flowchart TB
-    subgraph inputs [Inputs]
-        STAR["schema/**/*.star"]
-        KESSEL["schema/kessel.star (DSL)"]
-    end
+```
+  Inputs                          Go interpreter                         Outputs              Downstream
+  -----                          ----------------                        -------              ----------
 
-    subgraph compiler [Go interpreter]
-        CLI["cmd/interpreter"]
-        LOADER["lang.Loader"]
-        PROC["lang.Processor"]
-        VIS["output.SchemaVisitor"]
-        WRITER["output.WriteSchemas"]
-    end
-
-    subgraph outputs [Outputs]
-        JS["JSON Schema (Draft-07)"]
-        KSIL["KSIL JSON namespaces"]
-    end
-
-    subgraph downstream [Downstream]
-        INV["inventory-api"]
-        RBAC["rbac-config → ksl → SpiceDB"]
-    end
-
-    STAR --> LOADER
-    KESSEL --> LOADER
-    CLI --> LOADER
-    LOADER --> PROC
-    PROC --> VIS
-    VIS --> WRITER
-    WRITER --> JS
-    WRITER --> KSIL
-    JS --> INV
-    KSIL --> RBAC
+  schema/**/*.star  ──┐
+  schema/kessel.star  ├──▶  cmd/interpreter
+                          │        │
+                          │        ▼
+                          │   lang.Loader  ──▶  execute .star, cache modules, record metadata
+                          │        │
+                          │        ▼
+                          │   lang.Processor  ──▶  walk resource structs, dispatch to visitor
+                          │        │
+                          │        ▼
+                          │   output.SchemaVisitor  (JSONSchemaVisitor or KSILVisitor)
+                          │        │
+                          │        ▼
+                          └──   output.WriteSchemas
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                             ▼
+           JSON Schema (Draft-07)        KSIL JSON namespaces
+                    │                             │
+                    ▼                             ▼
+             inventory-api              rbac-config → ksl → SpiceDB
 ```
 
 **Key Design Decision**: Single processor with pluggable visitors, not separate compilers per output format.
@@ -239,18 +229,33 @@ At least one of `JSONSCHEMA_OUTPUT_DIR` or `KSL_OUTPUT_DIR` must be set; the int
 
 starlark-unified-schema uses a layered pipeline from Starlark source to disk artifacts:
 
-```mermaid
-flowchart TD
-    A["1. Module Loading<br/>(lang.Loader)"] --> B["2. Resource Discovery<br/>(lang.Processor)"]
-    B --> C["3. Semantic Walk<br/>(Processor → SchemaVisitor)"]
-    C --> D["4. Output Aggregation<br/>(SchemaVisitor.Results)"]
-    D --> E["5. Write<br/>(output.WriteSchemas)"]
-
-    A -.- A1["Execute .star files, resolve load(), cache modules, record metadata"]
-    B -.- B1["Find globals with kind=resource"]
-    C -.- C1["Visit fields, relations, permissions"]
-    D -.- D1["JSON Schema by type; KSIL by reporter namespace"]
-    E -.- E1["Write files under configured output dirs"]
+```
+1. Module Loading (lang.Loader)
+   └─> Execute .star files via go.starlark.net
+   └─> Resolve load() imports relative to schema root
+   └─> Cache parsed module globals
+   └─> Record metadata for each resource (reporter, type name, id_type)
+        │
+        ▼
+2. Resource Discovery (lang.Processor)
+   └─> Scan module globals for structs tagged kind="resource"
+   └─> Skip non-resource values (common representation dicts, helpers)
+        │
+        ▼
+3. Semantic Walk (lang.Processor → SchemaVisitor)
+   └─> Visit common representation members (fields, relations, permissions)
+   └─> Visit reporter-specific fields
+   └─> Resolve cross-resource relation targets via metadata registry
+   └─> Walk permission expression trees (and/or/unless/ref/subref)
+        │
+        ▼
+4. Output Aggregation (SchemaVisitor.Results)
+   └─> JSON Schema: group by type name → common + per-reporter schemas
+   └─> KSIL: group by reporter namespace → one JSON file per namespace
+        │
+        ▼
+5. Write (output.WriteSchemas)
+   └─> Create directories, write files, validate paths stay within output root
 ```
 
 ### Starlark DSL
@@ -436,62 +441,87 @@ func WriteSchemas(outputDir string, entries []OutputEntry) error
 
 ### Component Interaction
 
-```mermaid
-sequenceDiagram
-    participant CLI
-    participant Loader
-    participant Starlark
-    participant Processor
-    participant Visitor
-    participant Writer
-
-    CLI->>Loader: NewLoader(schema/)
-    CLI->>Processor: NewProcessor(loader)
-    CLI->>Visitor: NewJSONSchemaVisitor() or NewKSILVisitor()
-
-    loop each configured output
-        CLI->>Processor: Process(visitor, files...)
-        loop each .star module
-            Processor->>Loader: Load(module)
-            Loader->>Starlark: ExecFileOptions + load()
-            Starlark-->>Loader: globals (resource structs)
-            Loader->>Loader: recordMetadata(resources)
-            loop each resource in module
-                Processor->>Visitor: BeginType / VisitResource / ...
-            end
-        end
-        CLI->>Visitor: Results()
-        Visitor-->>CLI: []OutputEntry
-        CLI->>Writer: WriteSchemas(outputDir, entries)
-    end
+```
+CLI
+ │
+ ├─▶ Loader.NewLoader(schema/)
+ ├─▶ Processor.NewProcessor(loader)
+ └─▶ Visitor.NewJSONSchemaVisitor()  OR  Visitor.NewKSILVisitor()
+      │
+      │  [repeat for each configured output directory]
+      │
+      ├─▶ Processor.Process(visitor, files...)
+      │    │
+      │    │  [for each .star module]
+      │    │
+      │    ├─▶ Loader.Load(module)
+      │    │    │
+      │    │    ├─▶ Starlark.ExecFileOptions + load()
+      │    │    │    └── returns globals (resource structs)
+      │    │    │
+      │    │    └─▶ Loader.recordMetadata(resources)
+      │    │
+      │    └─▶ [for each resource in module]
+      │         Processor ──▶ Visitor.BeginType / VisitResource / ...
+      │
+      ├─▶ Visitor.Results()
+      │    └── returns []OutputEntry
+      │
+      └─▶ WriteSchemas(outputDir, entries)
 ```
 
 When both `JSONSCHEMA_OUTPUT_DIR` and `KSL_OUTPUT_DIR` are set, the outer loop runs twice — once per visitor — with independent visitor state.
 
 ### JSON Schema Compilation Flow
 
-```mermaid
-flowchart TD
-    S1["CLI reads JSONSCHEMA_OUTPUT_DIR"] --> S2["NewJSONSchemaVisitor()"]
-    S2 --> S3["Processor.Process(visitor, files...)"]
-    S3 --> S3a["Loader.Load(): execute Starlark, record metadata"]
-    S3a --> S3b["Visit common + reporter members as schema shapes"]
-    S3b --> S4["JSONSchemaVisitor.Results()"]
-    S4 --> S4a["Group by type name"]
-    S4a --> S5["WriteSchemas → Draft-07 JSON files"]
+```
+1. CLI reads JSONSCHEMA_OUTPUT_DIR
+        │
+        ▼
+2. NewJSONSchemaVisitor()
+        │
+        ▼
+3. Processor.Process(visitor, files...)
+   For each .star module:
+     Loader.Load() → execute Starlark, record metadata
+     For each resource struct:
+       Visit common members → data fields + relations (as schema shapes)
+       Visit reporter fields → reporter-specific properties
+        │
+        ▼
+4. JSONSchemaVisitor.Results()
+   Group by type name
+   Emit common_representation.json + reporters/<reporter>/<type>.json
+        │
+        ▼
+5. WriteSchemas(JSONSCHEMA_OUTPUT_DIR, entries)
+   Write Draft-07 JSON Schema files
 ```
 
 ### KSIL Compilation Flow
 
-```mermaid
-flowchart TD
-    K1["CLI reads KSL_OUTPUT_DIR"] --> K2["NewKSILVisitor()"]
-    K2 --> K3["Processor.Process(visitor, files...)"]
-    K3 --> K3a["Loader.Load(): execute Starlark, record metadata"]
-    K3a --> K3b["Visit common + reporter relations and permissions"]
-    K3b --> K4["KSILVisitor.Results()"]
-    K4 --> K4a["Group by reporter namespace; intermediate.Store()"]
-    K4a --> K5["WriteSchemas → <reporter>.json files"]
+```
+1. CLI reads KSL_OUTPUT_DIR
+        │
+        ▼
+2. NewKSILVisitor()
+        │
+        ▼
+3. Processor.Process(visitor, files...)
+   For each .star module:
+     Loader.Load() → execute Starlark, record metadata
+     For each resource struct:
+       Visit common members → relations + permissions
+       Visit reporter fields → relations + permissions
+        │
+        ▼
+4. KSILVisitor.Results()
+   Group by reporter namespace
+   Serialize via intermediate.Store() → <reporter>.json
+        │
+        ▼
+5. WriteSchemas(KSL_OUTPUT_DIR, entries)
+   Write KSIL namespace JSON files
 ```
 
 ## Key Design Patterns
