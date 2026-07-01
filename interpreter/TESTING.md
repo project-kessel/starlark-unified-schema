@@ -28,7 +28,7 @@ End-to-end semantic behavior without writing files to disk:
 1. Create an in-memory schema reader: `newInMemorySourceFileReader("schema")`.
 2. Load the real DSL: `setupProcessorWithKessel(t, reader)` — loads `kessel.star` from disk via `addRealSchemaFile`.
 3. Add inline `.star` fixtures with `reader.AddFile(...)`.
-4. Run `processor.Process(util.NewSpyVisitor())`.
+4. Run `processor.Process(...)`.
 5. Assert with `spy.AssertJSON(t, \`{...}\`)` — golden JSON of visitor callbacks.
 
 Example skeleton:
@@ -70,12 +70,7 @@ For cross-resource relations, define or load dependency modules before modules t
 
 ## Gaps and extension guidance
 
-There are no JSON Schema or KSIL golden-file integration tests in-repo today. Output correctness is validated indirectly via SpyVisitor and manual `make build-schema` inspection.
-
-If you add output-level tests:
-
-- Follow the processor + visitor patterns above rather than snapshotting entire generated files, unless explicitly requested.
-- Consider package-local `TESTING.md` notes if a new test style is introduced under a different subtree.
+There are no JSON Schema or KSIL golden-file integration tests in-repo today. Output correctness is validated indirectly via SpyVisitor and manual `make build-schema` inspection. Update these instructions to capture the patterns for those tests once they're established.
 
 ## When to add tests
 
