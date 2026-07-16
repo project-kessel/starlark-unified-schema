@@ -89,7 +89,7 @@ These map directly to inventory-api paths under `data/schema/resources/`.
 | Input from processor | JSON Schema output |
 |----------------------|-------------------|
 | Data fields | Object properties with types, constraints, `required` |
-| Relations | Mapped to data-field shapes by cardinality (`ExactlyOne` → required scalar; `Many` → array) |
+| Relations | Mapped to data-field shapes by cardinality (`at_most_one` → optional scalar; `one` → required scalar; `at_least_one` → array with at least one item; `many` → array;) |
 | Permissions | Ignored |
 
 Resources are grouped by **type name** (the Starlark variable name, e.g. `host`). Relations use the target resource's `id_type`, not a nested object schema.
@@ -270,6 +270,8 @@ The DSL lives in `schema/kessel.star` and is plain Starlark — no custom interp
 | `at_most_one`, `one`, `at_least_one`, `many`, `wildcard` | Relation cardinality helpers |
 | `self()` | Relation target referring to the enclosing resource |
 | `permissions={ "name": lambda proxy: ... }` | Permission factories evaluated at schema load time |
+| `.union(...)`, `.intersect(...)`, `.except(...)` | Set operations available on relations and permissions when defining a permission. Ex: `lambda w: w.direct_value.union(w.parent.value)` |
+| `any(...)`, `all(...)` | Logic helpers, equivalent to chaining `.union(...)` or `.intersect(...)` respectively. Ex: `lambda w: any(w.direct_value, w.parent.value)` |
 
 A minimal resource:
 
