@@ -1,51 +1,47 @@
-load("kessel.star", "relation", "assignable", "cardinality", "union", "intersect", "exclude", "subref", "ref", "uuid")
-load("rbac.star", "workspace")
+# Feature Simple Schema — Original proposal (service → workspace direction)
+#
+# Service points to workspaces and billing accounts. Workspace has children/descendants
+# for downward traversal. Check starts at the service:
+#     zed permission check features/service:RHEL can_workspace_use_service rbac/workspace:ws1
+#
+# This is the same schema as feature-simple-old.star, translated to the new syntax
+# used by schema/kessel.star. See feature-simple-old.star for the original syntax.
 
-add_member("rbac", "workspace", "child", relation(assignable("rbac", "workspace", cardinality.Any, uuid())))
+load("kessel.star", "resource", "uuid", "many", "at_most_one", "self", "any")
 
-add_member("rbac", "workspace", "descendents", relation(
-    union(
-        ref("child"),
-        subref("child", "descendents")
-    )
-))
+workspace = resource(reporter="rbac", id_type=uuid(),
+fields={
+    "parent": at_most_one(self()),
+    "children": many(self()),
+},
+permissions={
+    "descendants": lambda w: w.children.union(w.children.descendants),
+})
 
-service = {
-    "allowed_workspaces": relation(assignable("rbac", "workspace", cardinality.Any, uuid())),
+billing_account = resource(reporter="features", id_type=uuid(),
+fields={
+    "workspaces": many(workspace),
+},
+permissions={
+    "enabled_workspaces": lambda b: b.workspaces.union(b.workspaces.descendants),
+})
 
-    "billing_account": relation(assignable("feature", "billing_account", cardinality.Any, uuid())),
-
-    "parent": relation(assignable("feature", "service", cardinality.Any, uuid())),
-
-    "does_workspace_have_service_preference": relation(
-        union(
-            union(
-                ref("allowed_workspaces"),
-                subref("allowed_workspaces", "descendents")
-            ),
-            subref("parent", "does_workspace_have_service_preference")
-        )
+service = resource(reporter="features", id_type=uuid(),
+fields={
+    "allowed_workspaces": many(workspace),
+    "billing_account": many(billing_account),
+    "parent": at_most_one(self()),
+},
+permissions={
+    "does_workspace_have_service_preference": lambda s: any(
+        s.allowed_workspaces,
+        s.allowed_workspaces.descendants,
+        s.parent.does_workspace_have_service_preference,
     ),
 
-    "does_workspace_have_license": relation(
-        subref("billing_account", "enabled_workspaces")
+    "does_workspace_have_license": lambda s: s.billing_account.enabled_workspaces,
+
+    "can_workspace_use_service": lambda s: s.does_workspace_have_service_preference.intersect(
+        s.does_workspace_have_license,
     ),
-
-    "can_workspace_use_service": relation(
-        intersect(
-            ref("does_workspace_have_service_preference"),
-            ref("does_workspace_have_license")
-        )
-    )
-}
-
-billing_account = {
-    "workspace": relation(assignable("rbac", "workspace", cardinality.Any, uuid())),
-
-    "enabled_workspaces": relation(
-        union(
-            ref("workspace"),
-            subref("workspace", "descendents")
-        )
-    )
-}
+})
