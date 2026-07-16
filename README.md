@@ -36,6 +36,7 @@ interpreter/                    # Go compiler (Starlark → JSON Schema + KSIL)
   cmd/interpreter/              # CLI entry point
   internal/lang/                # Starlark loader and processor
   internal/output/              # JSON Schema and KSIL visitors
+  internal/util                 # Additional helper types like the SpyVisitor used in tests
 references/                     # Example schemas for reference (in an obsolete format / for modeling purposes only)
 Makefile                        # build-interpreter, build-schema, test
 .env                            # Output directory configuration (local, not committed with secrets)
