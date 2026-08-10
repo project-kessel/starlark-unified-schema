@@ -40,6 +40,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/project-kessel/ksl-schema-language v0.1.1 h1:ToFqCA+C5NIlh44YxDSOqHsHXiWWhAe9OHgFm9ozEQU=
 github.com/project-kessel/ksl-schema-language v0.1.1/go.mod h1:nxfUX6yrpnbDgEw0SOsuRnNmMsOQ5caUx+PeQu4m3To=
+github.com/project-kessel/ksl-schema-language v0.1.2 h1:JBqWhpzFVMq6/HU/MnEPn6Cuh1Np/AD0PDwSnWu0LZ0=
+github.com/project-kessel/ksl-schema-language v0.1.2/go.mod h1:nxfUX6yrpnbDgEw0SOsuRnNmMsOQ5caUx+PeQu4m3To=
 github.com/rs/xid v1.5.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
 github.com/rs/zerolog v1.32.0 h1:keLypqrlIjaFsbmJOBdB/qvyF8KEtCWHwobLp5l/mQ0=
 github.com/rs/zerolog v1.32.0/go.mod h1:/7mN4D5sKwJLZQ2b/znpjC3/GQWY/xaDXUM0kKWRHss=

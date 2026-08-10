@@ -90,12 +90,18 @@ def _get_relation_names(self_names, types):
                 result[name] = True
             for name in type.common:
                 result[name] = True
+            #TODO: does this need to traverse the parent type too?
         else:
             fail("Unknown relation type: {}".format(type.kind))
     return result.keys()
 
-def _create_proxy(common, fields, permission_names):
+def _create_proxy(common, parent, fields, permission_names):
     fields_types = _extract_relation_types(common) | _extract_relation_types(fields)
+
+    if parent != None:
+        fields_types = fields_types | _extract_relation_types(parent.fields)
+        #Need to capture parent permission names too
+
     self_names = fields_types.keys() + permission_names
     proxy_fields = {}
 
@@ -105,10 +111,11 @@ def _create_proxy(common, fields, permission_names):
     for permission_name in permission_names:
         proxy_fields[permission_name] = _make_ref(permission_name, [])
 
+
     return struct(kind="proxy", **proxy_fields)
 
-def _process_permissions(common, object, permissions):
-    proxy = _create_proxy(common, object, permissions.keys())
+def _process_permissions(common, parent, object, permissions):
+    proxy = _create_proxy(common, parent, object, permissions.keys())
     combined_fields = {}
 
     for field_name in object:
@@ -121,9 +128,9 @@ def _process_permissions(common, object, permissions):
 
     return combined_fields
 
-def resource(reporter, id_type, common={}, fields={}, permissions={}):
-    combined_fields = _process_permissions(common, fields, permissions)
-    return struct(kind="resource", reporter=reporter, id_type=id_type, common=common, fields=combined_fields)
+def resource(reporter, id_type, extends=None, common={}, fields={}, permissions={}):
+    combined_fields = _process_permissions(common, extends, fields, permissions)
+    return struct(kind="resource", reporter=reporter, id_type=id_type, parent=extends, common=common, fields=combined_fields)
 
 def text(minLength=None, maxLength=None, regex=None):
     return struct(kind="text", minLength=minLength, maxLength=maxLength, regex=regex)

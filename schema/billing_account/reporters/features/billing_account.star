@@ -1,10 +1,8 @@
-load("kessel.star", "resource", "field", "uuid", "many")
-load("workspace/reporters/rbac/workspace.star", "workspace")
+load("kessel.star", "resource", "uuid", "many")
+load("service/reporters/features/service.star", "service")
 
 billing_account = resource(reporter="features", 
 id_type=uuid(), 
 fields={
-    "workspaces": many(workspace),
-}, permissions={
-    "enabled_workspaces": lambda b: b.workspaces.union(b.workspaces.descendants)
+    "services": many(service)
 })
