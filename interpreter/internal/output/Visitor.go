@@ -6,9 +6,14 @@ type Members struct {
 	Permissions    []any
 }
 
+type ResourceTypeReference struct {
+	Name     string
+	Reporter string
+}
+
 type SchemaVisitor interface {
 	BeginType(name string)
-	VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members) error
+	VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error
 
 	VisitDataField(name string, required bool, description *string, dataType any) any
 

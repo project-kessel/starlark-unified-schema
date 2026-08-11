@@ -47,7 +47,7 @@ func (k *KSILVisitor) BeginRelation(name string) {
 
 func (k *KSILVisitor) BeginType(name string) {}
 
-func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members) error {
+func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error {
 	if _, exists := k.namespaces[reporter]; !exists {
 		k.namespaces[reporter] = &intermediate.Namespace{
 			Name:  reporter,

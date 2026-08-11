@@ -21,7 +21,7 @@ func NewJSONSchemaVisitor() *JSONSchemaVisitor {
 
 func (v *JSONSchemaVisitor) BeginType(name string) {}
 
-func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members) error {
+func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error {
 	entry, exists := v.root[typeName].(node)
 	if !exists {
 		entry = node{"common": nil, "reporters": node{}}

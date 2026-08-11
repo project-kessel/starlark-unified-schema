@@ -57,11 +57,11 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 		if !ok {
 			continue
 		}
-		isResource, err := isResource(s)
+		structIsResource, err := isResource(s)
 		if err != nil {
 			return fmt.Errorf("error checking if %s is a resource: %w", varName, err)
 		}
-		if !isResource {
+		if !structIsResource {
 			continue
 		}
 
@@ -74,35 +74,73 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 			return fmt.Errorf("resource %s: reporter is required", varName)
 		}
 
-		visitor.BeginType(varName)
-
-		var commonMembers *output.Members
-		commonDict, err := getDictAttr("common", s)
+		parent, err := getStructAttr("parent", s)
 		if err != nil {
-			return fmt.Errorf("error getting common members of %s: %w", varName, err)
+			return fmt.Errorf("error checking if %s extends another type: %w", varName, err)
 		}
-		commonMembers, err = p.visitMembers(nil, commonDict, visitor)
+		if parent != nil {
+			parentIsResource, err := isResource(parent)
+			if err != nil {
+				return fmt.Errorf("error checking if the parent of %s is a resource: %w", varName, err)
+			}
+			if !parentIsResource {
+				return fmt.Errorf("type %s extends a non-resource type: %w", varName, err)
+			}
+
+			meta, ok := p.metadata[parent]
+			if !ok {
+				return fmt.Errorf("metadata not found for type %+v", meta)
+			}
+
+			err = p.processResourceType(visitor, varName, reporter, s, &meta)
+		} else {
+			err = p.processResourceType(visitor, varName, reporter, s, nil)
+		}
+
 		if err != nil {
-			return fmt.Errorf("error visiting common members of %s: %w", varName, err)
-		}
-
-		var reporterMembers *output.Members
-		if reporter != "" {
-			fieldsDict, err := getDictAttr("fields", s)
-			if err != nil {
-				return fmt.Errorf("error getting reporter %s fields of %s: %w", reporter, varName, err)
-			}
-			reporterMembers, err = p.visitMembers(s, fieldsDict, visitor)
-			if err != nil {
-				return fmt.Errorf("error visiting reporter %s fields of %s: %w", reporter, varName, err)
-			}
-		}
-
-		if err := visitor.VisitResource(varName, reporter, commonMembers, reporterMembers); err != nil {
 			return err
 		}
 	}
 
+	return nil
+}
+
+func (p *Processor) processResourceType(visitor output.SchemaVisitor, varName string, reporter string, resource *starlarkstruct.Struct, parentMeta *meta) error {
+	visitor.BeginType(varName)
+
+	var commonMembers *output.Members
+	commonDict, err := getDictAttr("common", resource)
+	if err != nil {
+		return fmt.Errorf("error getting common members of %s: %w", varName, err)
+	}
+	commonMembers, err = p.visitMembers(nil, commonDict, visitor)
+	if err != nil {
+		return fmt.Errorf("error visiting common members of %s: %w", varName, err)
+	}
+
+	var reporterMembers *output.Members
+	if reporter != "" {
+		fieldsDict, err := getDictAttr("fields", resource)
+		if err != nil {
+			return fmt.Errorf("error getting reporter %s fields of %s: %w", reporter, varName, err)
+		}
+		reporterMembers, err = p.visitMembers(resource, fieldsDict, visitor)
+		if err != nil {
+			return fmt.Errorf("error visiting reporter %s fields of %s: %w", reporter, varName, err)
+		}
+	}
+
+	var parentReference *output.ResourceTypeReference
+	if parentMeta != nil {
+		parentReference = &output.ResourceTypeReference{
+			Name:     parentMeta.typeName,
+			Reporter: parentMeta.reporter,
+		}
+	}
+
+	if err := visitor.VisitResource(varName, reporter, commonMembers, reporterMembers, parentReference); err != nil {
+		return err
+	}
 	return nil
 }
 

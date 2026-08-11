@@ -653,6 +653,133 @@ this_resource = resource("test", id_type=uuid(), fields={
 }`)
 }
 
+func TestInheritedResource(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/parent.star", []byte(`
+load("kessel.star", "resource", "uuid")
+
+parent = resource("test", id_type=uuid())`))
+
+	reader.AddFile("test/child.star", []byte(`
+load("kessel.star", "resource", "uuid")
+load("test/parent.star", "parent")
+
+child = resource("test", id_type=uuid(), extends=parent)
+`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+	"parent": {
+		"common": {},
+		"reporters": {
+			"test": {}
+		}
+	},
+	"child": {
+		"common": {},
+		"reporters": {
+			"test": {
+				"extends": {"reporter": "test", "name": "parent"}
+			}
+		}
+	}
+}`)
+}
+
+func TestInheritedResourceWithHierarchy(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/folder.star", []byte(`
+load("kessel.star", "resource", "uuid", "at_most_one", "self")
+
+folder = resource("test", id_type=uuid(), fields={
+	"parent": at_most_one(self()),
+})`))
+
+	reader.AddFile("test/special_folder.star", []byte(`
+load("kessel.star", "resource", "uuid", "wildcard", "self")
+load("test/folder.star", "folder")
+
+special_folder = resource("test", id_type=uuid(), extends=folder, fields={
+	"direct_flag": wildcard(self())
+}, 
+permissions={
+	"flag": lambda f: f.direct_flag.union(f.parent.flag)
+})
+`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+    "folder": {
+        "common": {},
+        "reporters": {
+            "test": {
+                "relations": [
+                    {
+                        "cardinality": "AtMostOne",
+                        "dataType": {
+                            "kind": "uuid"
+                        },
+                        "kind": "relation",
+                        "name": "parent",
+                        "reporter": "test",
+                        "typeName": "folder"
+                    }
+                ]
+            }
+        }
+    },
+    "special_folder": {
+        "common": {},
+        "reporters": {
+            "test": {
+                "extends": {
+                    "name": "folder",
+                    "reporter": "test"
+                },
+                "relations": [
+                    {
+                        "cardinality": "All",
+                        "dataType": {
+                            "kind": "uuid"
+                        },
+                        "kind": "relation",
+                        "name": "direct_flag",
+                        "reporter": "test",
+                        "typeName": "special_folder"
+                    }
+                ],
+                "permissions": [
+                    {
+                        "body": {
+                            "kind": "or",
+                            "left": {
+                                "kind": "reference",
+                                "name": "direct_flag"
+                            },
+                            "right": {
+                                "kind": "subreference",
+                                "name": "parent",
+                                "sub": "flag"
+                            }
+                        },
+                        "kind": "permission",
+                        "name": "flag"
+                    }
+                ]
+            }
+        }
+    }
+}`)
+}
+
 var loadedRealSchemaFiles = map[string][]byte{}
 
 func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {

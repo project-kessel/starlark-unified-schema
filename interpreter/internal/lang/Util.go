@@ -98,6 +98,9 @@ func getStructAttr(name string, s *starlarkstruct.Struct) (*starlarkstruct.Struc
 	if err != nil {
 		return nil, fmt.Errorf("error accessing member %s of struct %+v: %w", name, s, err)
 	}
+	if _, ok := v.(starlark.NoneType); ok {
+		return nil, nil
+	}
 	if structValue, ok := v.(*starlarkstruct.Struct); ok {
 		return structValue, nil
 	}
