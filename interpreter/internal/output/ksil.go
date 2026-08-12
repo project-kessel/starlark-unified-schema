@@ -50,8 +50,10 @@ func (k *KSILVisitor) BeginType(name string) {}
 func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error {
 	if _, exists := k.namespaces[reporter]; !exists {
 		k.namespaces[reporter] = &intermediate.Namespace{
-			Name:  reporter,
-			Types: []*intermediate.Type{},
+			Name:                 reporter,
+			Types:                []*intermediate.Type{},
+			ExtensionDefinitions: []*intermediate.ExtensionDefinition{},
+			ExtensionReferences:  []*intermediate.ExtensionReference{},
 		}
 	}
 
@@ -73,16 +75,108 @@ func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMemb
 		typedRelations = append(typedRelations, perm.(*intermediate.Relation))
 	}
 
+	ns := k.namespaces[reporter]
+	if extendsResource != nil {
+		k.constructSubclassExtensionAndAddToNamespace(ns, typeName, typedRelations, extendsResource)
+	} else {
+		k.constructTypeAndAddToNamespace(ns, typeName, typedRelations)
+	}
+	return nil
+}
+
+func (k *KSILVisitor) constructTypeAndAddToNamespace(ns *intermediate.Namespace, typeName string, relations []*intermediate.Relation) {
 	typeObj := &intermediate.Type{
 		Name:      typeName,
-		Relations: typedRelations,
+		Relations: relations,
 	}
 
 	// Add to the appropriate namespace
-	ns := k.namespaces[reporter]
 	ns.Types = append(ns.Types, typeObj)
+}
 
-	return nil
+func (k *KSILVisitor) constructSubclassExtensionAndAddToNamespace(ns *intermediate.Namespace, typeName string, relations []*intermediate.Relation, parent *ResourceTypeReference) {
+	ownsMember := map[string]bool{}
+	for _, r := range relations {
+		ownsMember[r.Name] = true
+	}
+
+	subclass := &intermediate.DynamicType{
+		Name:       literalValueToDynamicName(parent.Name),
+		Namespace:  &parent.Reporter,
+		Visibility: "public", //The default value when not specified in KSL
+		Relations:  []*intermediate.DynamicRelation{},
+	}
+
+	relation_prefix := ns.Name + "_" + typeName + "_"
+	for _, relation := range relations {
+		dynamicRelation := &intermediate.DynamicRelation{
+			Name:             literalValueToDynamicName(relation_prefix + relation.Name),
+			Visibility:       relation.Visibility,
+			IgnoreDuplicates: false,
+			Body:             *literalToDynamicBody(relation.Body, ownsMember, relation_prefix),
+		}
+
+		subclass.Relations = append(subclass.Relations, dynamicRelation)
+	}
+
+	extension := &intermediate.ExtensionDefinition{
+		Name:       typeName,
+		Visibility: "internal",
+		Params:     []string{},
+		Types:      []*intermediate.DynamicType{subclass},
+	}
+
+	call := &intermediate.ExtensionReference{
+		Namespace: ns.Name,
+		Name:      typeName,
+		Params:    map[string]string{},
+	}
+
+	ns.ExtensionDefinitions = append(ns.ExtensionDefinitions, extension)
+	ns.ExtensionReferences = append(ns.ExtensionReferences, call)
+}
+
+func literalToDynamicBody(body *intermediate.RelationBody, ownsMember map[string]bool, prefix string) *intermediate.DynamicRelationBody {
+	dynamicBody := &intermediate.DynamicRelationBody{
+		Kind:        body.Kind,
+		Types:       body.Types,
+		Cardinality: body.Cardinality,
+	}
+	switch body.Kind {
+	case "self":
+		break
+	case "reference":
+		relation := body.Relation
+		if ownsMember[relation] {
+			relation = prefix + relation
+		}
+		dynamicBody.Relation = literalValueToDynamicName(relation)
+	case "nested_reference":
+		relation := body.Relation
+		subrelation := body.SubRelation
+		if ownsMember[relation] {
+			relation = prefix + relation
+		} else {
+			if ownsMember[subrelation] {
+				subrelation = prefix + subrelation //TODO: this is only correct if the relation portion is self-type
+			}
+		}
+
+		dynamicBody.Relation = literalValueToDynamicName(relation)
+		dynamicBody.SubRelation = literalValueToDynamicName(subrelation)
+	case "union", "intersect", "except":
+		dynamicBody.Left = literalToDynamicBody(body.Left, ownsMember, prefix)
+		dynamicBody.Right = literalToDynamicBody(body.Right, ownsMember, prefix)
+	}
+
+	return dynamicBody
+}
+
+func literalValueToDynamicName(name string) *intermediate.DynamicName {
+	return &intermediate.DynamicName{
+		Kind:  "literal",
+		Value: name,
+	}
 }
 
 func (k *KSILVisitor) VisitReferenceExpression(name string) any {
