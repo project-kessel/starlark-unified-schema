@@ -128,7 +128,15 @@ def _process_permissions(common, parent, object, permissions):
 
     return combined_fields
 
-def resource(reporter, id_type, extends=None, common={}, fields={}, permissions={}):
+def resource(reporter, id_type=None, extends=None, common={}, fields={}, permissions={}):
+    if id_type == None and extends==None:
+        fail("resource: either an id_type or a type to extend must be specified")
+    
+    if extends != None:
+        if id_type != None:
+            fail("resource: a resource type extending another type must not specify an id_type")
+        id_type = extends.id_type #Inherit the id type from the parent
+
     combined_fields = _process_permissions(common, extends, fields, permissions)
     return struct(kind="resource", reporter=reporter, id_type=id_type, parent=extends, common=common, fields=combined_fields)
 

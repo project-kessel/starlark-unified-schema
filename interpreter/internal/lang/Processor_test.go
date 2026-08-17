@@ -663,10 +663,10 @@ load("kessel.star", "resource", "uuid")
 parent = resource("test", id_type=uuid())`))
 
 	reader.AddFile("test/child.star", []byte(`
-load("kessel.star", "resource", "uuid")
+load("kessel.star", "resource")
 load("test/parent.star", "parent")
 
-child = resource("test", id_type=uuid(), extends=parent)
+child = resource("test", extends=parent)
 `))
 
 	spy := processAndVisit(t, processor)
@@ -705,7 +705,7 @@ folder = resource("test", id_type=uuid(), fields={
 load("kessel.star", "resource", "uuid", "wildcard", "self")
 load("test/folder.star", "folder")
 
-special_folder = resource("test", id_type=uuid(), extends=folder, fields={
+special_folder = resource("test", extends=folder, fields={
 	"direct_flag": wildcard(self())
 }, 
 permissions={
