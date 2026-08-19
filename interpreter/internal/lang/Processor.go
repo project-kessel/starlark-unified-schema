@@ -92,13 +92,24 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 				return fmt.Errorf("metadata not found for type %+v", meta)
 			}
 
+			parentFinal, err := getBoolAttr("final", parent)
+			if err != nil {
+				return fmt.Errorf("error checking if type is final: %w", err)
+			}
+
+			if parentFinal {
+				return fmt.Errorf("type %s attempting to extend final type %s", varName, meta.typeName)
+			}
+
 			err = p.processResourceType(visitor, varName, reporter, s, &meta)
+			if err != nil {
+				return err
+			}
 		} else {
 			err = p.processResourceType(visitor, varName, reporter, s, nil)
-		}
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 	}
 

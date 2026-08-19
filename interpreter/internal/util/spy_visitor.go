@@ -28,17 +28,6 @@ The content of a visitor can then be asserted as equivalent to a given golden js
 */
 type node map[string]any
 
-type resourceNode struct {
-	name     string
-	reporter string
-
-	data node
-}
-
-func (n *resourceNode) MarshalJSON() ([]byte, error) {
-	return json.Marshal(n.data)
-}
-
 func (v *SpyVisitor) BeginType(name string) {}
 
 func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonMembers *output.Members, reporterMembers *output.Members, extendsResource *output.ResourceTypeReference) error {
@@ -60,7 +49,7 @@ func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonMembe
 		if extendsResource != nil {
 			data["extends"] = createNode(map[string]any{"name": extendsResource.Name, "reporter": extendsResource.Reporter})
 		}
-		reporters[reporter] = &resourceNode{name: typeName, reporter: reporter, data: data}
+		reporters[reporter] = data
 	}
 
 	return nil

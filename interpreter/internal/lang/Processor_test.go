@@ -31,6 +31,16 @@ func processAndVisit(t *testing.T, processor *Processor) *util.SpyVisitor {
 	return spy
 }
 
+func processAndVisitForError(t *testing.T, processor *Processor) error {
+	t.Helper()
+
+	spy := util.NewSpyVisitor()
+	err := processor.Process(spy)
+
+	assert.Error(t, err)
+	return err
+}
+
 func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
 	reader := newInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
@@ -687,6 +697,237 @@ child = resource("test", extends=parent)
 			}
 		}
 	}
+}`)
+}
+
+func TestUnableToInheritFromFinalResource(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource", "uuid")
+
+parent = resource("test", id_type=uuid(), final=True)
+child = resource("test", extends=parent)
+	`))
+
+	err := processAndVisitForError(t, processor)
+
+	assert.Contains(t, err.Error(), "final type")
+}
+
+func TestUnableToInheritFromSubclassResource(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource", "uuid")
+
+grandparent = resource("test", id_type=uuid())
+parent = resource("test", extends=grandparent)
+child = resource("test", extends=parent)
+	`))
+
+	err := processAndVisitForError(t, processor)
+
+	assert.Contains(t, err.Error(), "final type")
+}
+
+func TestMustProvideIDTypeOrParentType(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource")
+
+r = resource("test")`))
+
+	err := processAndVisitForError(t, processor)
+
+	assert.Contains(t, err.Error(), "id_type")
+}
+
+func TestCannotProvideIDTypeIfProvidingParentType(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource", "uuid")
+
+parent = resource("test", id_type=uuid())
+r = resource("test", id_type=uuid(), extends=parent)`))
+
+	err := processAndVisitForError(t, processor)
+
+	assert.Contains(t, err.Error(), "extend")
+}
+
+func TestResourceCanInheritRelationsAndPermissionsFromParent(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource", "uuid", "self", "at_most_one", "wildcard")
+
+parent = resource("test", id_type=uuid(), fields={
+	"parent": at_most_one(self()),
+	"direct_flag": wildcard(self())
+}, permissions={
+	"flag": lambda p: p.direct_flag.union(p.parent.flag)
+})
+child = resource("test", extends=parent, permissions={
+	"parent_flag": lambda c: c.flag.exclude(c.direct_flag)
+})`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+{
+    "child": {
+        "common": {},
+        "reporters": {
+            "test": {
+                "extends": {
+                    "name": "parent",
+                    "reporter": "test"
+                },
+                "permissions": [
+                    {
+                        "body": {
+                            "kind": "unless",
+                            "left": {
+                                "kind": "reference",
+                                "name": "flag"
+                            },
+                            "right": {
+                                "kind": "reference",
+                                "name": "direct_flag"
+                            }
+                        },
+                        "kind": "permission",
+                        "name": "parent_flag"
+                    }
+                ]
+            }
+        }
+    },
+    "parent": {
+        "common": {},
+        "reporters": {
+            "test": {
+                "permissions": [
+                    {
+                        "body": {
+                            "kind": "or",
+                            "left": {
+                                "kind": "reference",
+                                "name": "direct_flag"
+                            },
+                            "right": {
+                                "kind": "subreference",
+                                "name": "parent",
+                                "sub": "flag"
+                            }
+                        },
+                        "kind": "permission",
+                        "name": "flag"
+                    }
+                ],
+                "relations": [
+                    {
+                        "cardinality": "AtMostOne",
+                        "dataType": {
+                            "kind": "uuid"
+                        },
+                        "kind": "relation",
+                        "name": "parent",
+                        "reporter": "test",
+                        "typeName": "parent"
+                    },
+                    {
+                        "cardinality": "All",
+                        "dataType": {
+                            "kind": "uuid"
+                        },
+                        "kind": "relation",
+                        "name": "direct_flag",
+                        "reporter": "test",
+                        "typeName": "parent"
+                    }
+                ]
+            }
+        }
+    }
+}`)
+}
+
+func TestResourceCanInheritCommonMembersFromParent(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource", "uuid", "self", "at_most_one", "wildcard")
+
+principal = resource("test", id_type=uuid())
+common = {
+	"direct_flag": wildcard(principal)
+}
+	
+parent = resource("test", id_type=uuid(), common=common)
+child = resource("test", extends=parent, permissions={
+	"flag": lambda c: c.direct_flag
+})`))
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `
+	{
+    "child": {
+        "common": {},
+        "reporters": {
+            "test": {
+                "extends": {
+                    "name": "parent",
+                    "reporter": "test"
+                },
+                "permissions": [
+                    {
+                        "body": {
+                            "kind": "reference",
+                            "name": "direct_flag"
+                        },
+                        "kind": "permission",
+                        "name": "flag"
+                    }
+                ]
+            }
+        }
+    },
+    "parent": {
+        "common": {
+            "relations": [
+                {
+                    "cardinality": "All",
+                    "dataType": {
+                        "kind": "uuid"
+                    },
+                    "kind": "relation",
+                    "name": "direct_flag",
+                    "reporter": "test",
+                    "typeName": "principal"
+                }
+            ]
+        },
+        "reporters": {
+            "test": {}
+        }
+    },
+    "principal": {
+        "common": {},
+        "reporters": {
+            "test": {}
+        }
+    }
 }`)
 }
 
