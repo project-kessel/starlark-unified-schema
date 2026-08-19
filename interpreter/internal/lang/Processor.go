@@ -89,7 +89,7 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 
 			meta, ok := p.metadata[parent]
 			if !ok {
-				return fmt.Errorf("metadata not found for type %+v", meta)
+				return fmt.Errorf("metadata not found for type %+v", parent)
 			}
 
 			parentFinal, err := getBoolAttr("final", parent)
@@ -212,7 +212,7 @@ func (p *Processor) visitMembers(self *starlarkstruct.Struct, fields *starlark.D
 			}
 			metadata, ok := p.metadata[typeStruct]
 			if !ok {
-				return nil, fmt.Errorf("metadata not found for type %s", typeStruct)
+				return nil, fmt.Errorf("metadata not found for type %+v", typeStruct)
 			}
 
 			idType, err := visitDataType(metadata.idType, visitor)
