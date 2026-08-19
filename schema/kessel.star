@@ -90,7 +90,7 @@ def _get_relation_names(self_names, types):
                 result[name] = True
             for name in type.common:
                 result[name] = True
-            #TODO: does this need to traverse the parent type too?
+            #TODO: will need to traverse the parent type as well once references to sub-types are supported
         else:
             fail("Unknown relation type: {}".format(type.kind))
     return result.keys()
