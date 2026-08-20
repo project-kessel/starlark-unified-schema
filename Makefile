@@ -6,7 +6,8 @@
 # once those services onboard.
 SHIPPED_SCHEMA_FILES ?= \
 	service/reporters/features/service.star \
-	billing_account/reporters/features/billing_account.star
+	billing_account/reporters/features/billing_account.star \
+	workspace/reporters/features/workspace.star
 
 # KSIL files included in ksl.tar.gz. Do not ship hbi.json / rbac.json until
 # those namespaces migrate off hand-authored .ksl in rbac-config.
