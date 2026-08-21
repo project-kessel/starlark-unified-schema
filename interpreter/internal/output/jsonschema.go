@@ -121,7 +121,7 @@ func buildObjectSchema(fields []any, explicitRequired []string) node {
 		required = []string{}
 	}
 
-	return node{"type": "object", "properties": properties, "required": required}
+	return node{"type": "object", "properties": properties, "required": required, "additionalProperties": false}
 }
 
 func (v *JSONSchemaVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {
@@ -221,13 +221,14 @@ func (v *JSONSchemaVisitor) VisitRelation(name string, reporter string, typeName
 	case "ExactlyOne":
 		return v.VisitDataField(name, true, nil, idType)
 	case "AtLeastOne":
-		arrayType := v.VisitArrayDataType(idType)
+		arrayType := v.VisitArrayDataType(idType).(node)
+		arrayType["minItems"] = 1
 		return v.VisitDataField(name, true, nil, arrayType)
 	case "Many":
 		arrayType := v.VisitArrayDataType(idType)
 		return v.VisitDataField(name, false, nil, arrayType)
 	case "All":
-		wildcardType := v.VisitTextDataType(nil, nil, stringPtr("^\\*$"))
+		wildcardType := v.VisitTextDataType(nil, nil, stringPtr(fmt.Sprintf(`^%s/%s:\*$`, reporter, typeName)))
 		return v.VisitDataField(name, false, nil, wildcardType)
 	}
 	return nil
