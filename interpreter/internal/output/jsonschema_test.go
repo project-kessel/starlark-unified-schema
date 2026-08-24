@@ -479,9 +479,7 @@ func verifyJSONSchemaResults(t *testing.T, v *JSONSchemaVisitor, examples map[st
 		resultPaths[entry.Path] = true
 	}
 	for path := range examples {
-		if !assert.True(t, resultPaths[path], "no result entry found for example path: %s", path) {
-			return
-		}
+		assert.True(t, resultPaths[path], "no result entry found for example path: %s", path)
 	}
 
 	for _, entry := range results {
