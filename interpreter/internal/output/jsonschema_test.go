@@ -13,9 +13,12 @@ func TestJSONSchemaVisitorRequiredFields(t *testing.T) {
 	v.BeginType("required_fields")
 	required := v.VisitDataField("required", true, nil, v.VisitTextDataType(nil, nil, nil))
 	optional := v.VisitDataField("optional", false, nil, v.VisitTextDataType(nil, nil, nil))
-	v.VisitResource("required_fields", "test", nil, &Members{
+	err := v.VisitResource("required_fields", "test", nil, &Members{
 		DataFields: []any{required, optional},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"required_fields/common_representation.json": {
@@ -40,9 +43,12 @@ func TestJSONSchemaVisitorCommonFields(t *testing.T) {
 
 	v.BeginType("with_common")
 	common := v.VisitDataField("common", false, nil, v.VisitTextDataType(nil, nil, nil))
-	v.VisitResource("with_common", "test", &Members{
+	err := v.VisitResource("with_common", "test", &Members{
 		DataFields: []any{common},
 	}, &Members{}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_common/common_representation.json": {
@@ -66,9 +72,12 @@ func TestJSONSchemaVisitorUUIDFields(t *testing.T) {
 
 	v.BeginType("with_uuid")
 	uuid := v.VisitDataField("uuid", false, nil, v.VisitUUIDDataType())
-	v.VisitResource("with_uuid", "test", nil, &Members{
+	err := v.VisitResource("with_uuid", "test", nil, &Members{
 		DataFields: []any{uuid},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_uuid/common_representation.json": {
@@ -87,9 +96,12 @@ func TestJSONSchemaVisitorBooleanFields(t *testing.T) {
 
 	v.BeginType("with_flag")
 	flag := v.VisitDataField("flag", false, nil, v.VisitBooleanDataType())
-	v.VisitResource("with_flag", "test", nil, &Members{
+	err := v.VisitResource("with_flag", "test", nil, &Members{
 		DataFields: []any{flag},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_flag/common_representation.json": {
@@ -118,9 +130,12 @@ func TestJSONSchemaVisitorDateFields(t *testing.T) {
 
 	v.BeginType("with_timestamp")
 	timestamp := v.VisitDataField("timestamp", false, nil, v.VisitDateTimeDataType())
-	v.VisitResource("with_timestamp", "test", nil, &Members{
+	err := v.VisitResource("with_timestamp", "test", nil, &Members{
 		DataFields: []any{timestamp},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_timestamp/common_representation.json": {
@@ -144,9 +159,12 @@ func TestJSONSchemaVisitorEnumFields(t *testing.T) {
 
 	v.BeginType("with_enum")
 	enum := v.VisitDataField("enum", false, nil, v.VisitEnumDataType([]string{"apple", "orange"}))
-	v.VisitResource("with_enum", "test", nil, &Members{
+	err := v.VisitResource("with_enum", "test", nil, &Members{
 		DataFields: []any{enum},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_enum/common_representation.json": {
@@ -171,9 +189,12 @@ func TestJSONSchemaVisitorNullableFields(t *testing.T) {
 	v.BeginType("with_nullable")
 	non_nullable := v.VisitDataField("non_nullable", false, nil, v.VisitTextDataType(nil, nil, nil))
 	nullable := v.VisitDataField("nullable", false, nil, v.VisitNullableDataType(v.VisitTextDataType(nil, nil, nil)))
-	v.VisitResource("with_nullable", "test", nil, &Members{
+	err := v.VisitResource("with_nullable", "test", nil, &Members{
 		DataFields: []any{nullable, non_nullable},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_nullable/common_representation.json": {
@@ -200,9 +221,12 @@ func TestJSONSchemaVisitorCompositeTypeFields(t *testing.T) {
 	//Either 5 digits or a uuid
 	composite := v.VisitDataField("composite", false, nil, v.VisitCompositeDataType([]any{v.VisitTextDataType(nil, nil, &regex), v.VisitUUIDDataType()}))
 
-	v.VisitResource("with_composite", "test", nil, &Members{
+	err := v.VisitResource("with_composite", "test", nil, &Members{
 		DataFields: []any{composite},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_composite/common_representation.json": {
@@ -228,9 +252,12 @@ func TestJSONSchemaVisitorArrayFields(t *testing.T) {
 	v.BeginType("with_array")
 	array := v.VisitDataField("array", false, nil, v.VisitArrayDataType(v.VisitTextDataType(nil, nil, nil)))
 
-	v.VisitResource("with_array", "test", nil, &Members{
+	err := v.VisitResource("with_array", "test", nil, &Members{
 		DataFields: []any{array},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_array/common_representation.json": {
@@ -263,9 +290,12 @@ func TestJSONSchemaVisitorObjectFields(t *testing.T) {
 			v.VisitDataField("optional", false, nil, v.VisitTextDataType(nil, nil, nil)),
 		}, []string{"required"}))
 
-	v.VisitResource("with_obj", "test", nil, &Members{
+	err := v.VisitResource("with_obj", "test", nil, &Members{
 		DataFields: []any{obj},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_obj/common_representation.json": {
@@ -294,9 +324,12 @@ func TestJSONSchemaVisitorRelationFields(t *testing.T) {
 	at_least_one := v.VisitRelation("at_least_one", "test", "other", "AtLeastOne", v.VisitUUIDDataType())
 	many := v.VisitRelation("many", "test", "other", "Many", v.VisitUUIDDataType())
 	wildcard := v.VisitRelation("wildcard", "test", "other", "All", v.VisitUUIDDataType())
-	v.VisitResource("with_relation", "test", nil, &Members{
+	err := v.VisitResource("with_relation", "test", nil, &Members{
 		RelationFields: []any{at_most_one, one, at_least_one, many, wildcard},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"with_relation/common_representation.json": {
@@ -360,9 +393,12 @@ func TestJSONSchemaVisitorNumericFields(t *testing.T) {
 	v.BeginType("number_holder")
 	small := v.VisitDataField("small", false, nil, v.VisitNumericIDDataType(nil, &limit))
 	big := v.VisitDataField("big", false, nil, v.VisitNumericIDDataType(&limit, nil))
-	v.VisitResource("number_holder", "test", nil, &Members{
+	err := v.VisitResource("number_holder", "test", nil, &Members{
 		DataFields: []any{small, big},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"number_holder/common_representation.json": {
@@ -398,9 +434,12 @@ func TestJSONSchemaVisitorTextFields(t *testing.T) {
 	long := v.VisitDataField("long", false, nil, v.VisitTextDataType(&length, nil, nil))
 	three_digit := v.VisitDataField("three_digit", false, nil, v.VisitTextDataType(nil, nil, &regex))
 
-	v.VisitResource("text_holder", "test", nil, &Members{
+	err := v.VisitResource("text_holder", "test", nil, &Members{
 		DataFields: []any{short, long, three_digit},
 	}, nil)
+	if !assert.NoError(t, err, "error visiting resource") {
+		return
+	}
 
 	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
 		"text_holder/common_representation.json": {
