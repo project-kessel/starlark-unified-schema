@@ -13,12 +13,9 @@ on:
     branches: ['main']
   workflow_dispatch:
 
-# Least privilege for the deploy: read the repo, write Pages, mint the OIDC
-# token actions/deploy-pages exchanges with Pages.
+# Least privilege: read the repo for build, scoped deploy permissions on deploy job.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Allow one concurrent deploy; don't cancel an in-progress publish.
 concurrency:
@@ -55,6 +52,9 @@ jobs:
     name: Deploy to Pages
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

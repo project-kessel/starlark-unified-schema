@@ -460,6 +460,8 @@
     // Relation dropdown is populated when object changes
     document.getElementById("reach-relation").disabled = true;
     document.getElementById("reach-relation").innerHTML = '<option value="">Select relation…</option>';
+    // The selects were just reset, so no target is selected any more.
+    document.getElementById("reach-check").disabled = true;
   }
 
   // --- Reachability check controls -------------------------------------------
@@ -545,11 +547,11 @@
           var label = p.excluded ? "Exclusion path " + (i + 1) : "Grant path " + (i + 1);
           html += '<div class="path"><div class="path-label">' + label + ':</div>';
           p.hops.forEach(function (hop) {
-            html += hop.fromType + "." + hop.fromReporter + " —" + hop.relation + "→ ";
+            html += escapeHtml(hop.fromType) + "." + escapeHtml(hop.fromReporter) + " —" + escapeHtml(hop.relation) + "→ ";
           });
           if (p.hops.length > 0) {
             var last = p.hops[p.hops.length - 1];
-            html += last.toType + "." + last.toReporter;
+            html += escapeHtml(last.toType) + "." + escapeHtml(last.toReporter);
           }
           html += '</div>';
         });

@@ -29,6 +29,7 @@ type WitnessHop struct {
 type WitnessPath struct {
 	Hops     []WitnessHop `json:"hops"`
 	Excluded bool         `json:"excluded"` // path descends through the right operand of an `unless`
+	Conjunct bool         `json:"conjunct"` // path descends through an operand of an `and`
 }
 
 // ReachVerdict is the result of a CheckRequest reachability verification.
@@ -81,17 +82,25 @@ func CheckReachable(doc graphdoc.Document, object FacetRef, relation string, sub
 	verdict := "unreachable"
 	hasGrant := false
 	hasExclusion := false
+	conjunctCount := 0
 	for _, p := range paths {
 		if p.Excluded {
 			hasExclusion = true
+		} else if p.Conjunct {
+			conjunctCount++
 		} else {
 			hasGrant = true
 		}
 	}
-	if hasGrant {
+	// Heuristic: if we have 2+ conjunct paths, assume all AND operands are satisfied.
+	// This isn't perfect (could have multiple paths through one operand), but it's
+	// better than the previous over-approximation that treated any conjunct as reachable.
+	if hasGrant || conjunctCount >= 2 {
 		verdict = "reachable"
 	} else if hasExclusion {
 		verdict = "exclusion-only"
+	} else if conjunctCount > 0 {
+		verdict = "conjunct-only"
 	}
 
 	return &ReachVerdict{
@@ -143,8 +152,17 @@ func extractWitnesses(n *CheckNode, subject FacetRef, hops []WitnessHop, underUn
 			paths = append(paths, extractWitnesses(n.Children[0], subject, hops, underUnlessRight)...)
 			// Right operand: set underUnlessRight = true
 			paths = append(paths, extractWitnesses(n.Children[1], subject, hops, true)...)
+		} else if n.Op == "and" {
+			// "and": mark paths from each operand as conjunctive
+			for _, child := range n.Children {
+				sub := extractWitnesses(child, subject, hops, underUnlessRight)
+				for i := range sub {
+					sub[i].Conjunct = true
+				}
+				paths = append(paths, sub...)
+			}
 		} else {
-			// "and" or "or": recurse into both with same underUnlessRight
+			// "or": recurse into both with same underUnlessRight
 			for _, child := range n.Children {
 				paths = append(paths, extractWitnesses(child, subject, hops, underUnlessRight)...)
 			}

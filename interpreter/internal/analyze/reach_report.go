@@ -21,6 +21,9 @@ func FormatReachText(v *ReachVerdict) string {
 		sb.WriteString("✓ reachable\n")
 	case "exclusion-only":
 		sb.WriteString("⚠ reachable only through an exclusion (unless) branch\n")
+	case "conjunct-only":
+		sb.WriteString("⚠ subject matches one operand of an AND expression, but not all\n")
+		sb.WriteString("  (over-approximation: check requires ALL conjuncts to match)\n")
 	case "unreachable":
 		sb.WriteString("✗ no path — schema does not support this check\n")
 	}
@@ -33,9 +36,12 @@ func FormatReachText(v *ReachVerdict) string {
 	sb.WriteString("\n")
 	grantPaths := 0
 	exclusionPaths := 0
+	conjunctPaths := 0
 	for _, p := range v.Paths {
 		if p.Excluded {
 			exclusionPaths++
+		} else if p.Conjunct {
+			conjunctPaths++
 		} else {
 			grantPaths++
 		}
@@ -44,14 +50,26 @@ func FormatReachText(v *ReachVerdict) string {
 	if grantPaths > 0 {
 		sb.WriteString(fmt.Sprintf("Grant path(s): %d\n", grantPaths))
 		for i, p := range v.Paths {
-			if !p.Excluded {
+			if !p.Excluded && !p.Conjunct {
+				sb.WriteString(formatPath(i+1, p))
+			}
+		}
+	}
+
+	if conjunctPaths > 0 {
+		if grantPaths > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(fmt.Sprintf("Conjunct path(s): %d\n", conjunctPaths))
+		for i, p := range v.Paths {
+			if p.Conjunct && !p.Excluded {
 				sb.WriteString(formatPath(i+1, p))
 			}
 		}
 	}
 
 	if exclusionPaths > 0 {
-		if grantPaths > 0 {
+		if grantPaths > 0 || conjunctPaths > 0 {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(fmt.Sprintf("Exclusion path(s): %d\n", exclusionPaths))

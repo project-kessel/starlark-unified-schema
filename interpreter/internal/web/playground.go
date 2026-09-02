@@ -65,11 +65,12 @@ func BuildPlayground(files map[string][]byte, opts PlaygroundOptions) (string, e
 	page = strings.Replace(page, placeholderCytoscapeDagre, cytoscapeDagreJS, 1)
 	page = strings.Replace(page, placeholderCodemirrorJS, codemirrorJS, 1)
 	page = strings.Replace(page, placeholderCodemirrorPython, codemirrorPythonJS, 1)
-	page = strings.Replace(page, placeholderFiles, safeFiles, 1)
 	page = strings.Replace(page, placeholderLayout, layout, 1)
 	page = strings.Replace(page, placeholderWASMURL, wasmURL, 1)
 	page = strings.Replace(page, placeholderRender, renderJS, 1)
 	page = strings.Replace(page, placeholderPlaygroundApp, playgroundJS, 1)
+	// Substituted last: schema sources are arbitrary text and must not shadow page placeholders.
+	page = strings.Replace(page, placeholderFiles, safeFiles, 1)
 	return page, nil
 }
 

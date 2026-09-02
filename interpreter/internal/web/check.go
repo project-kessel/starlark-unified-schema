@@ -6,8 +6,8 @@ import (
 )
 
 // ExplainCheck is the authoritative graph.json -> check-cost transform for the
-// browser: given a compiled graph.json and a "TYPE[.REPORTER]#RELATION" target,
-// it returns the annotated proof tree as JSON — byte-identical to what
+// browser: given a compiled graph.json and a "REPORTER/TYPE#RELATION" target
+// ("TYPE#RELATION" when the type has a single reporter), it returns the annotated proof tree as JSON — byte-identical to what
 // `graph-analyze -check -format json` produces on the CLI, since both call the
 // same analyze.ExplainCheck. The in-browser WASM compiler (cmd/graph-wasm)
 // exposes this so the playground's inspector can annotate permissions with their

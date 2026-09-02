@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"syscall/js"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
@@ -33,7 +34,7 @@ import (
 func compile(this js.Value, args []js.Value) (result any) {
 	defer func() {
 		if r := recover(); r != nil {
-			result = failure(js.ValueOf(r).String())
+			result = failure(fmt.Sprint(r))
 		}
 	}()
 
@@ -78,7 +79,7 @@ func compile(this js.Value, args []js.Value) (result any) {
 func explainCheck(this js.Value, args []js.Value) (result any) {
 	defer func() {
 		if r := recover(); r != nil {
-			result = failure(js.ValueOf(r).String())
+			result = failure(fmt.Sprint(r))
 		}
 	}()
 
@@ -110,7 +111,7 @@ func explainCheck(this js.Value, args []js.Value) (result any) {
 func checkReachable(this js.Value, args []js.Value) (result any) {
 	defer func() {
 		if r := recover(); r != nil {
-			result = failure(js.ValueOf(r).String())
+			result = failure(fmt.Sprint(r))
 		}
 	}()
 

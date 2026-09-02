@@ -88,7 +88,7 @@ graph-playground: build-graph-playground build-graph-wasm
 # file://), so this must be served over http rather than opened as a file.
 serve-graph-playground: graph-playground
 	@echo "Serving $(GRAPH_PLAYGROUND_DIR) at http://localhost:$(GRAPH_WEB_PORT)/ (Ctrl-C to stop)"
-	cd "$(GRAPH_PLAYGROUND_DIR)" && python3 -m http.server $(GRAPH_WEB_PORT)
+	cd "$(GRAPH_PLAYGROUND_DIR)" && python3 -m http.server $(GRAPH_WEB_PORT) --bind 127.0.0.1
 
 clean:
 	rm -rf bin/

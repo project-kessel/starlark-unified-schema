@@ -28,7 +28,13 @@ func Read(path string) ([]byte, error) {
 // piping.
 func Write(path string, data []byte) error {
 	if path == "" {
-		fmt.Print(string(data))
+		n, err := os.Stdout.Write(data)
+		if err != nil {
+			return err
+		}
+		if n < len(data) {
+			return io.ErrShortWrite
+		}
 		return nil
 	}
 	if err := os.WriteFile(path, data, 0644); err != nil {
