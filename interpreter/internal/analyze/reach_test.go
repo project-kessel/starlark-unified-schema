@@ -134,8 +134,41 @@ func TestCheckReachableAnd(t *testing.T) {
 
 	v, err := CheckReachable(doc, FacetRef{"doc", "r"}, "admin", FacetRef{"user", "u"})
 	require.NoError(t, err)
-	require.Equal(t, "reachable", v.Verdict)
+	// When both operands of an AND reach the subject, all paths are conjunctive.
+	// The verdict is "conjunct-only" because we cannot statically prove that an
+	// instance exists where the subject satisfies both conditions.
+	require.Equal(t, "conjunct-only", v.Verdict)
 	require.Len(t, v.Paths, 2) // Both operands reach user.u
+	require.True(t, v.Paths[0].Conjunct)
+	require.True(t, v.Paths[1].Conjunct)
+}
+
+// TestCheckReachableAndPartial verifies that when only one operand of an AND
+// expression reaches the subject, the verdict is "conjunct-only" (not "reachable").
+func TestCheckReachableAndPartial(t *testing.T) {
+	graph := []byte(`{
+		"version": "1",
+		"nodes": [
+			{"id": "user", "typeName": "user", "reporters": {"u": {}}},
+			{"id": "group", "typeName": "group", "reporters": {"g": {}}},
+			{"id": "doc", "typeName": "doc", "reporters": {"r": {
+				"permissions": [{"name": "admin", "body": {"kind": "and", "left": {"kind": "reference", "name": "owner"}, "right": {"kind": "reference", "name": "can_admin"}}}]
+			}}}
+		],
+		"edges": [
+			{"kind": "relation", "source": "doc", "target": "user", "name": "owner", "cardinality": "AtMostOne", "scope": "reporter", "sourceReporter": "r", "targetReporter": "u"},
+			{"kind": "relation", "source": "doc", "target": "group", "name": "can_admin", "cardinality": "AtMostOne", "scope": "reporter", "sourceReporter": "r", "targetReporter": "g"}
+		]
+	}`)
+	doc, err := graphdoc.Parse(graph)
+	require.NoError(t, err)
+
+	// Check if user.u can reach admin - only the owner operand reaches it
+	v, err := CheckReachable(doc, FacetRef{"doc", "r"}, "admin", FacetRef{"user", "u"})
+	require.NoError(t, err)
+	require.Equal(t, "conjunct-only", v.Verdict)
+	require.Len(t, v.Paths, 1) // Only owner operand reaches user.u
+	require.True(t, v.Paths[0].Conjunct)
 }
 
 // TestCheckReachableUnless verifies that the right operand of UNLESS is flagged

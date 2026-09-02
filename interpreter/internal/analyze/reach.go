@@ -82,25 +82,22 @@ func CheckReachable(doc graphdoc.Document, object FacetRef, relation string, sub
 	verdict := "unreachable"
 	hasGrant := false
 	hasExclusion := false
-	conjunctCount := 0
+	hasConjunct := false
 	for _, p := range paths {
 		if p.Excluded {
 			hasExclusion = true
 		} else if p.Conjunct {
-			conjunctCount++
+			hasConjunct = true
 		} else {
 			hasGrant = true
 		}
 	}
-	// Heuristic: if we have 2+ conjunct paths, assume all AND operands are satisfied.
-	// This isn't perfect (could have multiple paths through one operand), but it's
-	// better than the previous over-approximation that treated any conjunct as reachable.
-	if hasGrant || conjunctCount >= 2 {
+	if hasGrant {
 		verdict = "reachable"
+	} else if hasConjunct {
+		verdict = "conjunct-only"
 	} else if hasExclusion {
 		verdict = "exclusion-only"
-	} else if conjunctCount > 0 {
-		verdict = "conjunct-only"
 	}
 
 	return &ReachVerdict{
