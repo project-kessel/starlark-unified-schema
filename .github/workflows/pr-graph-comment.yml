@@ -31,15 +31,18 @@ jobs:
 
       - name: Validate PR association
         id: pr
+        env:
+          PULL_REQUESTS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
         run: |
           # Require exactly one associated PR from the trusted workflow_run event.
           # An artifact can be forged to target a different PR; the event payload cannot.
-          pr_count=$(echo '${{ toJSON(github.event.workflow_run.pull_requests) }}' | jq 'length')
+          # Pass JSON through env to prevent injection via branch names with apostrophes.
+          pr_count=$(jq -e 'length' <<<"$PULL_REQUESTS")
           if [ "$pr_count" -ne 1 ]; then
             echo "::error::Expected exactly 1 associated PR, got $pr_count"
             exit 1
           fi
-          pr_number=$(echo '${{ toJSON(github.event.workflow_run.pull_requests) }}' | jq '.[0].number')
+          pr_number=$(jq -er '.[0].number' <<<"$PULL_REQUESTS")
           echo "number=$pr_number" >> "$GITHUB_OUTPUT"
 
       - name: Post or update comment

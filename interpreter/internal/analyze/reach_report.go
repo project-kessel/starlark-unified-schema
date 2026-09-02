@@ -22,8 +22,8 @@ func FormatReachText(v *ReachVerdict) string {
 	case "exclusion-only":
 		sb.WriteString("⚠ reachable only through an exclusion (unless) branch\n")
 	case "conjunct-only":
-		sb.WriteString("⚠ subject matches one operand of an AND expression, but not all\n")
-		sb.WriteString("  (over-approximation: check requires ALL conjuncts to match)\n")
+		sb.WriteString("⚠ subject has path(s) through an AND expression\n")
+		sb.WriteString("  (static analysis cannot prove that all conjuncts match)\n")
 	case "unreachable":
 		sb.WriteString("✗ no path — schema does not support this check\n")
 	}
