@@ -46,7 +46,7 @@ func (p *Processor) Process(visitor output.SchemaVisitor, files ...string) error
 	return nil
 }
 
-func (p *Processor) processModule(name string, visitor output.SchemaVisitor) error{
+func (p *Processor) processModule(name string, visitor output.SchemaVisitor) error {
 	globals, err := p.loader.Load(p.thread, name)
 	if err != nil {
 		return err

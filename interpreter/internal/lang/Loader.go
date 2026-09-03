@@ -26,13 +26,7 @@ func NewLoader(path string) *Loader {
 	return newLoaderForReader(path, &filesystemSourceFileReader{})
 }
 
-// NewLoaderForReader creates a Loader that reads from the given SourceFileReader.
-// Exported for use by the public compile package.
-func NewLoaderForReader(path string, reader SourceFileReader) *Loader {
-	return newLoaderForReader(path, reader)
-}
-
-func newLoaderForReader(path string, reader SourceFileReader) *Loader {
+func newLoaderForReader(path string, reader sourceFileReader) *Loader {
 	l := &Loader{
 		path:         path,
 		modules:      map[string]starlark.StringDict{},
@@ -145,14 +139,10 @@ func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thr
 	l.predeclared[name] = v
 }
 
-// SourceFileReader is the interface for reading source files.
-// Exported for use by the public compile package.
-type SourceFileReader interface {
+type sourceFileReader interface {
 	ReadFile(path string) ([]byte, error)
 	ListFiles(path string) ([]string, error)
 }
-
-type sourceFileReader = SourceFileReader
 
 type filesystemSourceFileReader struct{}
 
@@ -189,15 +179,6 @@ func (fs *filesystemSourceFileReader) ListFiles(root string) ([]string, error) {
 type inmemorySourceFileReader struct {
 	path  string
 	files map[string][]byte
-}
-
-// InMemorySourceFileReader allows reading from in-memory files.
-// Exported for use by the public compile package.
-type InMemorySourceFileReader = inmemorySourceFileReader
-
-// NewInMemorySourceFileReader creates a new in-memory source file reader.
-func NewInMemorySourceFileReader(path string) *InMemorySourceFileReader {
-	return newInMemorySourceFileReader(path)
 }
 
 func newInMemorySourceFileReader(path string) *inmemorySourceFileReader {
