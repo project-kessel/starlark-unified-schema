@@ -12,7 +12,7 @@ type OutputEntry struct {
 	Contents []byte
 }
 
-func WriteSchemas(outputDir string, entries []OutputEntry) error {
+func WriteSchemas(outputDir string, entries []OutputEntry) error{
 	for _, entry := range entries {
 		cleanPath := filepath.Clean(entry.Path)
 		if filepath.IsAbs(cleanPath) || cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(os.PathSeparator)) {
