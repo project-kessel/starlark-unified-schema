@@ -1021,6 +1021,86 @@ permissions={
 }`)
 }
 
+func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
+	reader := newInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	for _, path := range []string{
+		"service/reporters/features/service.star",
+		"billing_account/reporters/features/billing_account.star",
+		"workspace/reporters/rbac/workspace.star",
+		"workspace/reporters/features/workspace.star",
+	} {
+		if err := addRealSchemaFile(reader, path); err != nil {
+			t.Fatalf("failed to add %s: %v", path, err)
+		}
+	}
+
+	spy := util.NewSpyVisitor()
+	if err := processor.Process(spy, "workspace/reporters/features/workspace.star"); err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	spy.AssertJSON(t, `{
+		"workspace": {
+			"common": {},
+			"reporters": {
+				"features": {
+					"extends": {"name": "workspace", "reporter": "rbac"},
+					"relations": [
+						{"kind": "relation", "name": "direct_billing_account", "cardinality": "AtMostOne", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "billing_account"},
+						{"kind": "relation", "name": "direct_service_preferences", "cardinality": "Many", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
+						{"kind": "relation", "name": "desire_all_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
+						{"kind": "relation", "name": "inherit_desired_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
+						{"kind": "relation", "name": "inherit_paid_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"}
+					],
+					"permissions": [
+						{
+							"kind": "permission",
+							"name": "_paid_services",
+							"body": {
+								"kind": "or",
+								"left": {"kind": "subreference", "name": "direct_billing_account", "sub": "services"},
+								"right": {
+									"kind": "and",
+									"left": {"kind": "subreference", "name": "parent", "sub": "_paid_services"},
+									"right": {"kind": "reference", "name": "inherit_paid_services"}
+								}
+							}
+						},
+						{
+							"kind": "permission",
+							"name": "_desired_services",
+							"body": {
+								"kind": "or",
+								"left": {
+									"kind": "or",
+									"left": {"kind": "reference", "name": "direct_service_preferences"},
+									"right": {"kind": "reference", "name": "desire_all_services"}
+								},
+								"right": {
+									"kind": "and",
+									"left": {"kind": "subreference", "name": "parent", "sub": "_desired_services"},
+									"right": {"kind": "reference", "name": "inherit_desired_services"}
+								}
+							}
+						},
+						{
+							"kind": "permission",
+							"name": "enabled_services",
+							"body": {
+								"kind": "and",
+								"left": {"kind": "reference", "name": "_paid_services"},
+								"right": {"kind": "reference", "name": "_desired_services"}
+							}
+						}
+					]
+				}
+			}
+		}
+	}`)
+}
+
 var loadedRealSchemaFiles = map[string][]byte{}
 
 func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {

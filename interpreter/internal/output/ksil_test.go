@@ -37,6 +37,36 @@ func TestKSILVisitorRelation(t *testing.T) {
 	})
 }
 
+func TestKSILVisitorWildcardRelation(t *testing.T) {
+	v := NewKSILVisitor()
+
+	r := v.VisitRelation("all_services", "features", "service", "All", v.VisitUUIDDataType())
+	assert.NoError(t, v.VisitResource("workspace", "features", &Members{}, &Members{
+		RelationFields: []any{r},
+	}, nil))
+
+	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
+		"features.json": {
+			Name: "features",
+			Types: []*intermediate.Type{
+				{
+					Name: "workspace",
+					Relations: []*intermediate.Relation{
+						{
+							Name: "all_services",
+							Body: &intermediate.RelationBody{
+								Kind:        "self",
+								Types:       []*intermediate.TypeReference{{Namespace: "features", Name: "service", All: true}},
+								Cardinality: "Any",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+}
+
 func TestKSILVisitorRelationWithPermission(t *testing.T) {
 	v := NewKSILVisitor()
 

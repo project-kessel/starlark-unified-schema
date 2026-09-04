@@ -245,13 +245,14 @@ func (k *KSILVisitor) Results() ([]OutputEntry, error) {
 }
 
 func (k *KSILVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any {
-	if cardinality == "Many" { //Convert to legacy cardinality
+	isWildcard := cardinality == "All"
+	if cardinality == "Many" || isWildcard { // Convert to legacy cardinality.
 		cardinality = "Any"
 	}
 
 	body := &intermediate.RelationBody{
 		Kind:        "self",
-		Types:       []*intermediate.TypeReference{{Namespace: reporter, Name: typeName}},
+		Types:       []*intermediate.TypeReference{{Namespace: reporter, Name: typeName, All: isWildcard}},
 		Cardinality: cardinality,
 	}
 
