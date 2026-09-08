@@ -1,22 +1,20 @@
 package lang
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func setupProcessorWithKessel(t *testing.T, reader *inmemorySourceFileReader) *Processor {
+func setupProcessorWithKessel(t *testing.T, reader *InmemorySourceFileReader) *Processor {
 	t.Helper()
 
-	if err := addRealSchemaFile(reader, "kessel.star"); err != nil {
+	if err := reader.AddRealSchemaFile("kessel.star"); err != nil {
 		t.Fatalf("failed to add kessel.star: %v", err)
 	}
 
-	loader := newLoaderForReader("schema", reader)
+	loader := NewLoaderForReader("schema", reader)
 	return NewProcessor(loader)
 }
 
@@ -42,7 +40,7 @@ func processAndVisitForError(t *testing.T, processor *Processor) error {
 }
 
 func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
@@ -75,7 +73,7 @@ host = resource(reporter="hbi", id_type=uuid(), common=common, fields={
 }
 
 func TestProcessorCommonOnlyFileProducesNoResources(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
@@ -92,7 +90,7 @@ host = {
 }
 
 func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/reporters/hbi/host.star", []byte(`
@@ -121,7 +119,7 @@ host = resource("hbi", id_type=uuid(), fields={
 }
 
 func TestProcessorSkipsLibraryModules(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	spy := processAndVisit(t, processor)
@@ -130,7 +128,7 @@ func TestProcessorSkipsLibraryModules(t *testing.T) {
 }
 
 func TestProcessorMultipleReportersMerge(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/common_representation.star", []byte(`
@@ -172,7 +170,7 @@ host = resource("acm", id_type=uuid(), common=common, fields={
 }
 
 func TestProcessorProcessesDependencyModuleAfterLoadCaching(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("host/reporters/rbac/host.star", []byte(`
@@ -206,7 +204,7 @@ host = resource("hbi", id_type=uuid(), fields={
 }
 
 func TestAssignableResourceReference(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/assignable_resource_reference.star", []byte(`
@@ -242,7 +240,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestAssignableSelfReference(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/assignable_self_reference.star", []byte(`
@@ -271,7 +269,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestPermissionLogicUnionIntersectExclude(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/relation_logic_union_intersect_exclude.star", []byte(`
@@ -334,7 +332,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestAnyPermission(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/any_permission.star", []byte(`
@@ -399,7 +397,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestAllPermission(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/all_permission.star", []byte(`
@@ -464,7 +462,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestPassthroughPermission(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/passthrough_permission.star", []byte(`
@@ -496,7 +494,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestPermissionWithBinaryLogic(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/permission_with_binary_logic.star", []byte(`
@@ -536,7 +534,7 @@ fields={
 }
 
 func TestPermissionCallingPermission(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/permission_calling_permission.star", []byte(`
@@ -571,7 +569,7 @@ fields={
 }
 
 func TestSubRefPermissionAcrossTypes(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/subref_permission_across_types.star", []byte(`
@@ -617,7 +615,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestRecursivePermission(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/recursive_permission.star", []byte(`
@@ -664,7 +662,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 }
 
 func TestInheritedResource(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/parent.star", []byte(`
@@ -701,7 +699,7 @@ child = resource("test", extends=parent)
 }
 
 func TestUnableToInheritFromFinalResource(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/resource.star", []byte(`
@@ -717,7 +715,7 @@ child = resource("test", extends=parent)
 }
 
 func TestUnableToInheritFromSubclassResource(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/resource.star", []byte(`
@@ -734,7 +732,7 @@ child = resource("test", extends=parent)
 }
 
 func TestMustProvideIDTypeOrParentType(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/resource.star", []byte(`
@@ -748,7 +746,7 @@ r = resource("test")`))
 }
 
 func TestCannotProvideIDTypeIfProvidingParentType(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/resource.star", []byte(`
@@ -763,7 +761,7 @@ r = resource("test", id_type=uuid(), extends=parent)`))
 }
 
 func TestResourceCanInheritRelationsAndPermissionsFromParent(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/resource.star", []byte(`
@@ -862,7 +860,7 @@ child = resource("test", extends=parent, permissions={
 }
 
 func TestResourceCanInheritCommonMembersFromParent(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/resource.star", []byte(`
@@ -932,7 +930,7 @@ child = resource("test", extends=parent, permissions={
 }
 
 func TestInheritedResourceWithHierarchy(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	reader.AddFile("test/folder.star", []byte(`
@@ -1022,7 +1020,7 @@ permissions={
 }
 
 func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
 	for _, path := range []string{
@@ -1031,7 +1029,7 @@ func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
 		"workspace/reporters/rbac/workspace.star",
 		"workspace/reporters/features/workspace.star",
 	} {
-		if err := addRealSchemaFile(reader, path); err != nil {
+		if err := reader.AddRealSchemaFile(path); err != nil {
 			t.Fatalf("failed to add %s: %v", path, err)
 		}
 	}
@@ -1099,18 +1097,4 @@ func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
 			}
 		}
 	}`)
-}
-
-var loadedRealSchemaFiles = map[string][]byte{}
-
-func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {
-	if contents, ok := loadedRealSchemaFiles[path]; ok {
-		return reader.AddFile(path, contents)
-	}
-	contents, err := os.ReadFile(filepath.Join("../../../schema/", path))
-	if err != nil {
-		return err
-	}
-	loadedRealSchemaFiles[path] = contents
-	return reader.AddFile(path, contents)
 }
