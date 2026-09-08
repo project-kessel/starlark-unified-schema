@@ -13,12 +13,12 @@ import (
 func TestE2E(t *testing.T) {
 	processor, reader := setupForTest(t)
 
-	reader.AddFile("principal.star", []byte(`
+	util.AddFile(t, reader, "principal.star", `
 load("kessel.star", "resource", "uuid")
 principal = resource("test", id_type=uuid())
-`))
+`)
 
-	reader.AddFile("container.star", []byte(`
+	util.AddFile(t, reader, "container.star", `
 load("kessel.star", "resource", "at_most_one", "many", "self", "uuid")
 load("principal.star", "principal")
 container = resource("test", id_type=uuid(), fields={
@@ -26,9 +26,9 @@ container = resource("test", id_type=uuid(), fields={
 	"direct_allowed_users": many(principal)
 }, permissions={
 	"allowed_users": lambda c: c.direct_allowed_users.union(c.parent.allowed_users)
-})`))
+})`)
 
-	reader.AddFile("special_container.star", []byte(`
+	util.AddFile(t, reader, "special_container.star", `
 load("kessel.star", "resource", "wildcard")
 load("principal.star", "principal")
 load("container.star", test_container="container")
@@ -37,17 +37,17 @@ container = resource("special", extends=test_container, fields={
 }, permissions={
 	"flag": lambda r: r.direct_flag.union(r.parent.flag)
 })
-`))
+`)
 
-	reader.AddFile("common.star", []byte(`
+	util.AddFile(t, reader, "common.star", `
 load("kessel.star", "one")
 load("container.star", "container")
 res = {
 	"container": one(container)
 }
-`))
+`)
 
-	reader.AddFile("res.star", []byte(`
+	util.AddFile(t, reader, "res.star", `
 load("kessel.star", "resource", "uuid", "field", "nullable", "union", "text")
 load("common.star", common="res")
 res = resource("test", common=common, id_type=uuid(), fields={
@@ -57,7 +57,7 @@ res = resource("test", common=common, id_type=uuid(), fields={
 }, permissions={
 	"operation": lambda r: r.container.allowed_users
 })
-`))
+`)
 
 	testNS := "test"
 

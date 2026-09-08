@@ -3,6 +3,7 @@ package lang
 import (
 	"testing"
 
+	"github.com/project-kessel/starlark-unified-schema/internal/util"
 	"github.com/stretchr/testify/assert"
 
 	"go.starlark.net/starlark"
@@ -23,8 +24,8 @@ func TestLoaderGetAllModulesWithEmptyDirectory(t *testing.T) {
 func TestLoaderIgnoresNonStarFiles(t *testing.T) {
 	loader, reader, _ := createDefaultLoaderReaderAndThread()
 
-	reader.AddFile("README.md", []byte{})
-	reader.AddFile("hello.star", []byte{})
+	util.AddFile(t, reader, "README.md", "")
+	util.AddFile(t, reader, "hello.star", "")
 
 	names, err := loader.GetAllModuleNames()
 	if !assert.NoError(t, err) {
@@ -40,7 +41,7 @@ func TestLoaderWithSingleFile(t *testing.T) {
 	loader, reader, thread := createDefaultLoaderReaderAndThread()
 	addSpyCallback(loader, func(v string) { values = append(values, v) })
 
-	reader.AddFile("hello.star", []byte(`spy("hello")`))
+	util.AddFile(t, reader, "hello.star", `spy("hello")`)
 
 	names, err := loader.GetAllModuleNames()
 	if !assert.NoError(t, err) {
@@ -61,10 +62,10 @@ func TestLoaderWithDependency(t *testing.T) {
 	loader, reader, thread := createDefaultLoaderReaderAndThread()
 	addSpyCallback(loader, func(v string) { values = append(values, v) })
 
-	reader.AddFile("values.star", []byte(`message = "hello"`))
-	reader.AddFile("hello.star", []byte(`
+	util.AddFile(t, reader, "values.star", `message = "hello"`)
+	util.AddFile(t, reader, "hello.star", `
 load("values.star", "message")
-spy(message)`))
+spy(message)`)
 
 	names, err := loader.GetAllModuleNames()
 	if !assert.NoError(t, err) {
@@ -82,11 +83,11 @@ spy(message)`))
 
 func TestLoaderWithNonResourceStruct(t *testing.T) {
 	loader, reader, thread := createDefaultLoaderReaderAndThread()
-	reader.AddFile("hello.star", []byte(`
+	util.AddFile(t, reader, "hello.star", `
 banana = struct(
 	message = "hello"
 )
-`))
+`)
 
 	metadata := map[resourceType]meta{}
 	loader.SetMetadata(metadata)

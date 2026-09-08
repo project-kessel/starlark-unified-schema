@@ -43,22 +43,22 @@ func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("host/common_representation.star", []byte(`
+	util.AddFile(t, reader, "host/common_representation.star", `
 load("kessel.star", "field", "text")
 
 host = {
     "workspace_id": field(type=text(), required=True),
 }
-`))
+`)
 
-	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/hbi/host.star", `
 load("kessel.star", "resource", "field", "uuid")
 load("host/common_representation.star", common="host")
 
 host = resource(reporter="hbi", id_type=uuid(), common=common, fields={
     "insights_id": field(type=uuid())
 })
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -76,13 +76,13 @@ func TestProcessorCommonOnlyFileProducesNoResources(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("host/common_representation.star", []byte(`
+	util.AddFile(t, reader, "host/common_representation.star", `
 load("kessel.star", "field", "text")
 
 host = {
     "workspace_id": field(type=text(), required=True),
 }
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -93,21 +93,21 @@ func TestProcessorDuplicateReporterReturnsError(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/hbi/host.star", `
 load("kessel.star", "resource", "field", "uuid")
 
 host = resource("hbi", id_type=uuid(), fields={
     "insights_id": field(type=uuid()),
 })
-`))
+`)
 
-	reader.AddFile("host/reporters/hbi/duplicate.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/hbi/duplicate.star", `
 load("kessel.star", "resource", "field", "uuid")
 
 host = resource("hbi", id_type=uuid(), fields={
     "satellite_id": field(type=uuid()),
 })
-`))
+`)
 
 	spy := util.NewSpyVisitor()
 	err := processor.Process(spy)
@@ -131,31 +131,31 @@ func TestProcessorMultipleReportersMerge(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("host/common_representation.star", []byte(`
+	util.AddFile(t, reader, "host/common_representation.star", `
 load("kessel.star", "field", "text")
 
 host = {
     "workspace_id": field(type=text(), required=True),
 }
-`))
+`)
 
-	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/hbi/host.star", `
 load("kessel.star", "resource", "field", "uuid")
 load("host/common_representation.star", common="host")
 
 host = resource("hbi", id_type=uuid(), common=common, fields={
     "insights_id": field(type=uuid()),
 })
-`))
+`)
 
-	reader.AddFile("host/reporters/acm/host.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/acm/host.star", `
 load("kessel.star", "resource", "field", "text", "uuid")
 load("host/common_representation.star", common="host")
 
 host = resource("acm", id_type=uuid(), common=common, fields={
     "cluster_id": field(type=text(), required=True),
 })
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -173,22 +173,22 @@ func TestProcessorProcessesDependencyModuleAfterLoadCaching(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("host/reporters/rbac/host.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/rbac/host.star", `
 load("kessel.star", "resource", "field", "text", "uuid")
 
 host = resource("rbac", id_type=uuid(), fields={
     "role": field(type=text(), required=True),
 })
-`))
+`)
 
-	reader.AddFile("host/reporters/hbi/host.star", []byte(`
+	util.AddFile(t, reader, "host/reporters/hbi/host.star", `
 load("kessel.star", "resource", "field", "uuid")
 load("host/reporters/rbac/host.star", rbac_host="host")
 
 host = resource("hbi", id_type=uuid(), fields={
     "insights_id": field(type=uuid()),
 })
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -207,14 +207,14 @@ func TestAssignableResourceReference(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/assignable_resource_reference.star", []byte(`
+	util.AddFile(t, reader, "test/assignable_resource_reference.star", `
 load("kessel.star", "at_most_one", "resource", "uuid")
 other = resource("test", id_type=uuid())
 
 this_resource = resource("test", id_type=uuid(), fields={
 	"other": at_most_one(other)
 	})
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -243,13 +243,13 @@ func TestAssignableSelfReference(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/assignable_self_reference.star", []byte(`
+	util.AddFile(t, reader, "test/assignable_self_reference.star", `
 load("kessel.star", "at_most_one", "self", "resource", "uuid")
 
 this_resource = resource("test", id_type=uuid(), fields={
 	"parent": at_most_one(self())
 	})
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -272,7 +272,7 @@ func TestPermissionLogicUnionIntersectExclude(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/relation_logic_union_intersect_exclude.star", []byte(`
+	util.AddFile(t, reader, "test/relation_logic_union_intersect_exclude.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid")
 
 this_resource = resource("test", id_type=uuid(), fields={
@@ -282,7 +282,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 	"union_perm": lambda r: r.relation1.union(r.relation2),
 	"intersect_perm": lambda r: r.relation1.intersect(r.relation2),
 	"exclude_perm": lambda r: r.relation1.exclude(r.relation2)
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -335,7 +335,7 @@ func TestAnyPermission(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/any_permission.star", []byte(`
+	util.AddFile(t, reader, "test/any_permission.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid", "any")
 
 this_resource = resource("test", id_type=uuid(), fields={
@@ -346,7 +346,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 	"any_one": lambda r: any(r.r1),
 	"any_two": lambda r: any(r.r1, r.r2),
 	"any_three": lambda r: any(r.r1, r.r2, r.r3)
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -400,7 +400,7 @@ func TestAllPermission(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/all_permission.star", []byte(`
+	util.AddFile(t, reader, "test/all_permission.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid", "all")
 
 this_resource = resource("test", id_type=uuid(), fields={
@@ -411,7 +411,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 	"all_one": lambda r: all(r.r1),
 	"all_two": lambda r: all(r.r1, r.r2),
 	"all_three": lambda r: all(r.r1, r.r2, r.r3)
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -465,13 +465,13 @@ func TestPassthroughPermission(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/passthrough_permission.star", []byte(`
+	util.AddFile(t, reader, "test/passthrough_permission.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid")
 this_resource = resource("test", id_type=uuid(), fields={
 	"relation": wildcard(self())
 }, permissions={
 	"permission": lambda r: r.relation
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -497,7 +497,7 @@ func TestPermissionWithBinaryLogic(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/permission_with_binary_logic.star", []byte(`
+	util.AddFile(t, reader, "test/permission_with_binary_logic.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid")
 this_resource = resource("test", id_type=uuid(),
 fields={
@@ -505,7 +505,7 @@ fields={
 	"right": wildcard(self())
 }, permissions={
 	"permission": lambda r: r.left.union(r.right)
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -537,7 +537,7 @@ func TestPermissionCallingPermission(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/permission_calling_permission.star", []byte(`
+	util.AddFile(t, reader, "test/permission_calling_permission.star", `
 load("kessel.star", "self", "at_most_one", "resource", "uuid")
 this_resource = resource("test", id_type=uuid(), 
 fields={
@@ -545,7 +545,7 @@ fields={
 }, permissions={
 	"inner": lambda r: r.relation,
 	"outer": lambda r: r.inner,
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -572,7 +572,7 @@ func TestSubRefPermissionAcrossTypes(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/subref_permission_across_types.star", []byte(`
+	util.AddFile(t, reader, "test/subref_permission_across_types.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid", "at_most_one")
 container = resource("test", id_type=uuid(), fields={
 	"flag": wildcard(self())
@@ -582,7 +582,7 @@ this_resource = resource("test", id_type=uuid(), fields={
 	"container": at_most_one(container)
 }, permissions={
 	"permission": lambda r: r.container.flag
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -618,14 +618,14 @@ func TestRecursivePermission(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/recursive_permission.star", []byte(`
+	util.AddFile(t, reader, "test/recursive_permission.star", `
 load("kessel.star", "self", "wildcard", "resource", "uuid", "at_most_one")
 this_resource = resource("test", id_type=uuid(), fields={
 	"parent": at_most_one(self()),
 	"flag": wildcard(self())
 }, permissions={
 	"permission": lambda r: r.flag.union(r.parent.permission)
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -665,17 +665,17 @@ func TestInheritedResource(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/parent.star", []byte(`
+	util.AddFile(t, reader, "test/parent.star", `
 load("kessel.star", "resource", "uuid")
 
-parent = resource("test", id_type=uuid())`))
+parent = resource("test", id_type=uuid())`)
 
-	reader.AddFile("test/child.star", []byte(`
+	util.AddFile(t, reader, "test/child.star", `
 load("kessel.star", "resource")
 load("test/parent.star", "parent")
 
 child = resource("test", extends=parent)
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 
@@ -702,12 +702,12 @@ func TestUnableToInheritFromFinalResource(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource", "uuid")
 
 parent = resource("test", id_type=uuid(), final=True)
 child = resource("test", extends=parent)
-	`))
+	`)
 
 	err := processAndVisitForError(t, processor)
 
@@ -718,13 +718,13 @@ func TestUnableToInheritFromSubclassResource(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource", "uuid")
 
 grandparent = resource("test", id_type=uuid())
 parent = resource("test", extends=grandparent)
 child = resource("test", extends=parent)
-	`))
+	`)
 
 	err := processAndVisitForError(t, processor)
 
@@ -735,10 +735,10 @@ func TestMustProvideIDTypeOrParentType(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource")
 
-r = resource("test")`))
+r = resource("test")`)
 
 	err := processAndVisitForError(t, processor)
 
@@ -749,11 +749,11 @@ func TestInvalidRelationReferenceFails(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource", "uuid")
 res = resource("test", id_type=uuid(), permissions={
 	"alias": lambda r: r.nonexistent
-})`))
+})`)
 
 	err := processAndVisitForError(t, processor)
 	assert.Contains(t, err.Error(), "has no .nonexistent attribute")
@@ -763,11 +763,11 @@ func TestCannotProvideIDTypeIfProvidingParentType(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource", "uuid")
 
 parent = resource("test", id_type=uuid())
-r = resource("test", id_type=uuid(), extends=parent)`))
+r = resource("test", id_type=uuid(), extends=parent)`)
 
 	err := processAndVisitForError(t, processor)
 
@@ -778,7 +778,7 @@ func TestResourceCanInheritRelationsAndPermissionsFromParent(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource", "uuid", "self", "at_most_one", "wildcard")
 
 parent = resource("test", id_type=uuid(), fields={
@@ -789,7 +789,7 @@ parent = resource("test", id_type=uuid(), fields={
 })
 child = resource("test", extends=parent, permissions={
 	"parent_flag": lambda c: c.flag.exclude(c.direct_flag)
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -877,7 +877,7 @@ func TestResourceCanInheritCommonMembersFromParent(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/resource.star", []byte(`
+	util.AddFile(t, reader, "test/resource.star", `
 load("kessel.star", "resource", "uuid", "self", "at_most_one", "wildcard")
 
 principal = resource("test", id_type=uuid())
@@ -888,7 +888,7 @@ common = {
 parent = resource("test", id_type=uuid(), common=common)
 child = resource("test", extends=parent, permissions={
 	"flag": lambda c: c.direct_flag
-})`))
+})`)
 
 	spy := processAndVisit(t, processor)
 
@@ -947,14 +947,14 @@ func TestInheritedResourceWithHierarchy(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
 
-	reader.AddFile("test/folder.star", []byte(`
+	util.AddFile(t, reader, "test/folder.star", `
 load("kessel.star", "resource", "uuid", "at_most_one", "self")
 
 folder = resource("test", id_type=uuid(), fields={
 	"parent": at_most_one(self()),
-})`))
+})`)
 
-	reader.AddFile("test/special_folder.star", []byte(`
+	util.AddFile(t, reader, "test/special_folder.star", `
 load("kessel.star", "resource", "uuid", "wildcard", "self")
 load("test/folder.star", "folder")
 
@@ -964,7 +964,7 @@ special_folder = resource("test", extends=folder, fields={
 permissions={
 	"flag": lambda f: f.direct_flag.union(f.parent.flag)
 })
-`))
+`)
 
 	spy := processAndVisit(t, processor)
 

@@ -12,6 +12,21 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+// SourceFileAdder is the subset of lang.InmemorySourceFileReader that AddFile
+// needs. Declared here so util does not import lang, which would cycle with
+// the lang package's own tests.
+type SourceFileAdder interface {
+	AddFile(path string, contents []byte) error
+}
+
+func AddFile(t *testing.T, reader SourceFileAdder, path string, contents string) {
+	t.Helper()
+
+	if err := reader.AddFile(path, []byte(contents)); err != nil {
+		t.Fatalf("failed to add %s: %v", path, err)
+	}
+}
+
 // The following were copied from the output folder and probably need to be shared somehow
 func VerifyJSONSchemaResults(t *testing.T, v output.SchemaVisitor, examples map[string]JsonSchemaTestCase) {
 	t.Helper()
