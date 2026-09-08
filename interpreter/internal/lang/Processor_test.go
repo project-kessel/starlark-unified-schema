@@ -745,6 +745,20 @@ r = resource("test")`))
 	assert.Contains(t, err.Error(), "id_type")
 }
 
+func TestInvalidRelationReferenceFails(t *testing.T) {
+	reader := NewInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	reader.AddFile("test/resource.star", []byte(`
+load("kessel.star", "resource", "uuid")
+res = resource("test", id_type=uuid(), permissions={
+	"alias": lambda r: r.nonexistent
+})`))
+
+	err := processAndVisitForError(t, processor)
+	assert.Contains(t, err.Error(), "has no .nonexistent attribute")
+}
+
 func TestCannotProvideIDTypeIfProvidingParentType(t *testing.T) {
 	reader := NewInMemorySourceFileReader("schema")
 	processor := setupProcessorWithKessel(t, reader)
