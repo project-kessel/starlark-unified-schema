@@ -29,14 +29,14 @@ func processAndVisit(t *testing.T, processor *Processor) *util.SpyVisitor {
 	return spy
 }
 
-func processAndVisitForError(t *testing.T, processor *Processor) error {
+func processAndVisitForError(t *testing.T, processor *Processor) (*util.SpyVisitor, error) {
 	t.Helper()
 
 	spy := util.NewSpyVisitor()
 	err := processor.Process(spy)
 
 	assert.Error(t, err)
-	return err
+	return spy, err
 }
 
 func TestProcessorMergesCommonAndReporterFields(t *testing.T) {
@@ -83,6 +83,17 @@ host = {
     "workspace_id": field(type=text(), required=True),
 }
 `)
+
+	spy := processAndVisit(t, processor)
+
+	spy.AssertJSON(t, `{}`)
+}
+
+func TestEmptySchemaIsNoop(t *testing.T) {
+	reader := NewInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	util.AddFile(t, reader, "test/empty.star", "")
 
 	spy := processAndVisit(t, processor)
 
@@ -709,7 +720,7 @@ parent = resource("test", id_type=uuid(), final=True)
 child = resource("test", extends=parent)
 	`)
 
-	err := processAndVisitForError(t, processor)
+	_, err := processAndVisitForError(t, processor)
 
 	assert.Contains(t, err.Error(), "final type")
 }
@@ -726,7 +737,7 @@ parent = resource("test", extends=grandparent)
 child = resource("test", extends=parent)
 	`)
 
-	err := processAndVisitForError(t, processor)
+	_, err := processAndVisitForError(t, processor)
 
 	assert.Contains(t, err.Error(), "final type")
 }
@@ -740,7 +751,7 @@ load("kessel.star", "resource")
 
 r = resource("test")`)
 
-	err := processAndVisitForError(t, processor)
+	_, err := processAndVisitForError(t, processor)
 
 	assert.Contains(t, err.Error(), "id_type")
 }
@@ -755,7 +766,7 @@ res = resource("test", id_type=uuid(), permissions={
 	"alias": lambda r: r.nonexistent
 })`)
 
-	err := processAndVisitForError(t, processor)
+	_, err := processAndVisitForError(t, processor)
 	assert.Contains(t, err.Error(), "has no .nonexistent attribute")
 }
 
@@ -769,9 +780,28 @@ load("kessel.star", "resource", "uuid")
 parent = resource("test", id_type=uuid())
 r = resource("test", id_type=uuid(), extends=parent)`)
 
-	err := processAndVisitForError(t, processor)
+	_, err := processAndVisitForError(t, processor)
 
 	assert.Contains(t, err.Error(), "extend")
+}
+
+func TestMalformedStarlarkFileErrors(t *testing.T) {
+	reader := NewInMemorySourceFileReader("schema")
+	processor := setupProcessorWithKessel(t, reader)
+
+	util.AddFile(t, reader, "malformed.star", `
+load("kessel.star", "resource", "uuid", "at_most_one", "self")
+
+r = resource("test", id_type=uuid(), fields={
+	"parent": at_most_one(self())
+}, permissions={
+	"alias": lamda r: r.parent
+})`)
+
+	spy, err := processAndVisitForError(t, processor)
+	spy.AssertJSON(t, "{}") //Ensure the errant file has no side-effects
+
+	assert.Contains(t, err.Error(), "error executing file malformed.star")
 }
 
 func TestResourceCanInheritRelationsAndPermissionsFromParent(t *testing.T) {
