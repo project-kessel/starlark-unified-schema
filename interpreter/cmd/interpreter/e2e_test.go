@@ -238,7 +238,7 @@ res = resource("test", common=common, id_type=uuid(), fields={
 
 func setupForTest(t *testing.T) (*lang.Processor, *lang.InmemorySourceFileReader) {
 	t.Helper()
-	reader := lang.NewInMemorySourceFileReader("schema")
+	reader := lang.NewInMemorySourceFileReader("schema", "../../../schema")
 	loader := lang.NewLoaderForReader("schema", reader)
 	processor := lang.NewProcessor(loader)
 

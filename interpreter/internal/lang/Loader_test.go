@@ -100,7 +100,7 @@ banana = struct(
 }
 
 func createDefaultLoaderReaderAndThread() (*Loader, *InmemorySourceFileReader, *starlark.Thread) {
-	reader := NewInMemorySourceFileReader("schema")
+	reader := NewInMemorySourceFileReader("schema", "../../../schema")
 	loader := NewLoaderForReader("schema", reader)
 	thread := &starlark.Thread{
 		Name: "test",

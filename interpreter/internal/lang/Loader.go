@@ -177,14 +177,16 @@ func (fs *filesystemSourceFileReader) ListFiles(root string) ([]string, error) {
 }
 
 type InmemorySourceFileReader struct {
-	path  string
-	files map[string][]byte
+	path           string
+	realSchemaPath string
+	files          map[string][]byte
 }
 
-func NewInMemorySourceFileReader(path string) *InmemorySourceFileReader {
+func NewInMemorySourceFileReader(path, realSchemaPath string) *InmemorySourceFileReader {
 	return &InmemorySourceFileReader{
-		path:  path,
-		files: map[string][]byte{},
+		path:           path,
+		realSchemaPath: realSchemaPath,
+		files:          map[string][]byte{},
 	}
 }
 
@@ -230,14 +232,16 @@ func (im *InmemorySourceFileReader) ListFiles(path string) ([]string, error) {
 var loadedRealSchemaFiles map[string][]byte = map[string][]byte{}
 
 func (im *InmemorySourceFileReader) AddRealSchemaFile(path string) error {
-	if contents, ok := loadedRealSchemaFiles[path]; ok {
+	realPath := filepath.Join(im.realSchemaPath, path)
+
+	if contents, ok := loadedRealSchemaFiles[realPath]; ok {
 		return im.AddFile(path, contents)
 	}
-	contents, err := os.ReadFile(filepath.Join("../../../schema/", path))
+	contents, err := os.ReadFile(realPath)
 	if err != nil {
 		return err
 	}
-	loadedRealSchemaFiles[path] = contents
+	loadedRealSchemaFiles[realPath] = contents
 	return im.AddFile(path, contents)
 }
 
