@@ -1051,8 +1051,8 @@ func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
 						{"kind": "relation", "name": "direct_billing_account", "cardinality": "AtMostOne", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "billing_account"},
 						{"kind": "relation", "name": "direct_service_preferences", "cardinality": "Many", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
 						{"kind": "relation", "name": "desire_all_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
-						{"kind": "relation", "name": "inherit_desired_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
-						{"kind": "relation", "name": "inherit_paid_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"}
+						{"kind": "relation", "name": "excluded_inherited_desired_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
+						{"kind": "relation", "name": "excluded_inherited_paid_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"}
 					],
 					"permissions": [
 						{
@@ -1062,9 +1062,9 @@ func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
 								"kind": "or",
 								"left": {"kind": "subreference", "name": "direct_billing_account", "sub": "services"},
 								"right": {
-									"kind": "and",
+									"kind": "unless",
 									"left": {"kind": "subreference", "name": "parent", "sub": "_paid_services"},
-									"right": {"kind": "reference", "name": "inherit_paid_services"}
+									"right": {"kind": "reference", "name": "excluded_inherited_paid_services"}
 								}
 							}
 						},
@@ -1079,9 +1079,9 @@ func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
 									"right": {"kind": "reference", "name": "desire_all_services"}
 								},
 								"right": {
-									"kind": "and",
+									"kind": "unless",
 									"left": {"kind": "subreference", "name": "parent", "sub": "_desired_services"},
-									"right": {"kind": "reference", "name": "inherit_desired_services"}
+									"right": {"kind": "reference", "name": "excluded_inherited_desired_services"}
 								}
 							}
 						},
