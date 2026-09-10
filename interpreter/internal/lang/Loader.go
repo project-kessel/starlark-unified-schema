@@ -23,10 +23,10 @@ type Loader struct {
 }
 
 func NewLoader(path string) *Loader {
-	return newLoaderForReader(path, &filesystemSourceFileReader{})
+	return NewLoaderForReader(path, &filesystemSourceFileReader{})
 }
 
-func newLoaderForReader(path string, reader sourceFileReader) *Loader {
+func NewLoaderForReader(path string, reader sourceFileReader) *Loader {
 	l := &Loader{
 		path:         path,
 		modules:      map[string]starlark.StringDict{},
@@ -176,19 +176,21 @@ func (fs *filesystemSourceFileReader) ListFiles(root string) ([]string, error) {
 	return names, nil
 }
 
-type inmemorySourceFileReader struct {
-	path  string
-	files map[string][]byte
+type InmemorySourceFileReader struct {
+	path           string
+	realSchemaPath string
+	files          map[string][]byte
 }
 
-func newInMemorySourceFileReader(path string) *inmemorySourceFileReader {
-	return &inmemorySourceFileReader{
-		path:  path,
-		files: map[string][]byte{},
+func NewInMemorySourceFileReader(path, realSchemaPath string) *InmemorySourceFileReader {
+	return &InmemorySourceFileReader{
+		path:           path,
+		realSchemaPath: realSchemaPath,
+		files:          map[string][]byte{},
 	}
 }
 
-func (im *inmemorySourceFileReader) AddFile(path string, contents []byte) error {
+func (im *InmemorySourceFileReader) AddFile(path string, contents []byte) error {
 	pathWithStem := filepath.Join(im.path, path)
 
 	if _, exists := im.files[pathWithStem]; exists {
@@ -200,7 +202,7 @@ func (im *inmemorySourceFileReader) AddFile(path string, contents []byte) error 
 	return nil
 }
 
-func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
+func (im *InmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
 	if contents, found := im.files[path]; found {
 		return contents, nil
 	} else {
@@ -208,7 +210,7 @@ func (im *inmemorySourceFileReader) ReadFile(path string) ([]byte, error) {
 	}
 }
 
-func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
+func (im *InmemorySourceFileReader) ListFiles(path string) ([]string, error) {
 	names := make([]string, 0, len(im.files))
 
 	for name := range im.files {
@@ -225,6 +227,22 @@ func (im *inmemorySourceFileReader) ListFiles(path string) ([]string, error) {
 	}
 
 	return names, nil
+}
+
+var loadedRealSchemaFiles map[string][]byte = map[string][]byte{}
+
+func (im *InmemorySourceFileReader) AddRealSchemaFile(path string) error {
+	realPath := filepath.Join(im.realSchemaPath, path)
+
+	if contents, ok := loadedRealSchemaFiles[realPath]; ok {
+		return im.AddFile(path, contents)
+	}
+	contents, err := os.ReadFile(realPath)
+	if err != nil {
+		return err
+	}
+	loadedRealSchemaFiles[realPath] = contents
+	return im.AddFile(path, contents)
 }
 
 type resourceType *starlarkstruct.Struct
