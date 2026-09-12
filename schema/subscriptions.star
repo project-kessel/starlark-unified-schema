@@ -1,0 +1,11 @@
+load("extensions/rbac.star", "add_v1_based_permission")
+
+add_v1_based_permission("subscriptions", "reports", "read", "subscriptions_report_view")
+add_v1_based_permission("subscriptions", "manifests", "read", "subscriptions_manifest_view")
+add_v1_based_permission("subscriptions", "manifests", "write", "subscriptions_manifest_edit")
+add_v1_based_permission("subscriptions", "organization", "read", "subscriptions_organization_view")
+add_v1_based_permission("subscriptions", "organization", "write", "subscriptions_organization_edit")
+add_v1_based_permission("subscriptions", "products", "read", "subscriptions_product_view")
+add_v1_based_permission("subscriptions", "products", "write", "subscriptions_product_edit")
+add_v1_based_permission("subscriptions", "cloud_access", "read", "subscriptions_cloud_access_view")
+add_v1_based_permission("subscriptions", "cloud_access", "write", "subscriptions_cloud_access_edit")
