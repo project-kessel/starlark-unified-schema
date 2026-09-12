@@ -113,6 +113,13 @@ func (p *Processor) processModule(name string, visitor output.SchemaVisitor) err
 		}
 	}
 
+	// Recorded while the module executed, inside p.loader.Load above.
+	for _, reference := range p.loader.extensionReferences(name) {
+		if err := visitor.VisitExtensionReference(reference.name, reference.namespace, reference.params); err != nil {
+			return fmt.Errorf("error visiting extension reference %s/%s: %w", reference.namespace, reference.name, err)
+		}
+	}
+
 	return nil
 }
 

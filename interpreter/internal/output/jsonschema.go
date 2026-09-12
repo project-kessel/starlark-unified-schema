@@ -21,6 +21,11 @@ func NewJSONSchemaVisitor() *JSONSchemaVisitor {
 
 func (v *JSONSchemaVisitor) BeginType(name string) {}
 
+// Extensions are a KSIL concept with no bearing on the data shape.
+func (v *JSONSchemaVisitor) VisitExtensionReference(name string, namespace string, params map[string]string) error {
+	return nil
+}
+
 func (v *JSONSchemaVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, _ *ResourceTypeReference) error {
 	entry, exists := v.root[typeName].(node)
 	if !exists {

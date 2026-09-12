@@ -20,6 +20,14 @@ type Loader struct {
 	reader       sourceFileReader
 	module_names []string
 	metadata     map[resourceType]meta
+
+	// Builtins run while a module is executing, long before the processor walks
+	// anything, so their effects are buffered here and keyed by the module that
+	// made the call. Scoping per module keeps them consistent with resources:
+	// a module only pulled in via load() contributes nothing unless it is
+	// processed in its own right.
+	currentModule  string
+	extensionCalls map[string][]extensionReferenceCall
 }
 
 func NewLoader(path string) *Loader {
@@ -28,13 +36,14 @@ func NewLoader(path string) *Loader {
 
 func NewLoaderForReader(path string, reader sourceFileReader) *Loader {
 	l := &Loader{
-		path:         path,
-		modules:      map[string]starlark.StringDict{},
-		opts:         &syntax.FileOptions{},
-		predeclared:  starlark.StringDict{},
-		module_names: nil,
-		reader:       reader,
-		metadata:     nil,
+		path:           path,
+		modules:        map[string]starlark.StringDict{},
+		opts:           &syntax.FileOptions{},
+		predeclared:    starlark.StringDict{},
+		module_names:   nil,
+		reader:         reader,
+		metadata:       nil,
+		extensionCalls: map[string][]extensionReferenceCall{},
 	}
 
 	registerDefaultBuiltins(l)
@@ -57,7 +66,12 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 		return nil, err
 	}
 
+	// Load recurses when a module load()s another, and is single-threaded, so
+	// saving and restoring the previous value is a sufficient stack.
+	previousModule := l.currentModule
+	l.currentModule = name
 	globals, err := starlark.ExecFileOptions(l.opts, thread, name, contents, l.predeclared)
+	l.currentModule = previousModule
 	if err != nil {
 		return nil, fmt.Errorf("error executing file %s: %w", name, err)
 	}
@@ -107,6 +121,23 @@ func (l *Loader) recordMetadata(globals starlark.StringDict) error {
 	}
 
 	return nil
+}
+
+// recordExtensionReference buffers a call_ksl_extension made by the module
+// currently executing.
+func (l *Loader) recordExtensionReference(name string, namespace string, params map[string]string) {
+	l.extensionCalls[l.currentModule] = append(l.extensionCalls[l.currentModule], extensionReferenceCall{
+		name:      name,
+		namespace: namespace,
+		params:    params,
+	})
+}
+
+// extensionReferences returns the calls made by a module, in source order. The
+// module cache in Load means a module executes only once, so calls survive to
+// be drained when that module is later processed in its own right.
+func (l *Loader) extensionReferences(module string) []extensionReferenceCall {
+	return l.extensionCalls[module]
 }
 
 func (l *Loader) GetAllModuleNames() ([]string, error) {
@@ -243,6 +274,12 @@ func (im *InmemorySourceFileReader) AddRealSchemaFile(path string) error {
 	}
 	loadedRealSchemaFiles[realPath] = contents
 	return im.AddFile(path, contents)
+}
+
+type extensionReferenceCall struct {
+	name      string
+	namespace string
+	params    map[string]string
 }
 
 type resourceType *starlarkstruct.Struct

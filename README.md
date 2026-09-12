@@ -32,6 +32,8 @@ schema/                         # Starlark schema source files (.star)
   <type>/                       # One directory per resource type (host, workspace, …)
     common_representation.star  # Shared fields/relations across reporters
     reporters/<reporter>/       # Reporter-specific resource definitions
+  extensions/<namespace>.star   # Future Starlark extensions and wrappers for RBAC extensions
+  <app>.star                    # Per-app extension calls (advisor, patch, …)
 interpreter/                    # Go compiler (Starlark → JSON Schema + KSIL)
   cmd/interpreter/              # CLI entry point
   internal/lang/                # Starlark loader and processor
@@ -45,7 +47,7 @@ output/                         # Generated artifacts (gitignored, primarily for
   ksl/                          # KSIL JSON output
 ```
 
-Each `.star` file that defines a `resource(...)` becomes input to the compiler. Files are discovered automatically from `schema/` unless specific paths are passed on the command line.
+Each `.star` file that defines a `resource(...)` or calls a KSL extension becomes input to the compiler. Files are discovered automatically from `schema/` unless specific paths are passed on the command line.
 
 ## Prerequisites
 
@@ -144,6 +146,8 @@ hbi.json
 rbac.json
 features.json
 ```
+
+If any schema file calls `call_ksl_extension(...)`, an additional `extensions.json` is written holding those references. See [ARCHITECTURE.md](ARCHITECTURE.md#backward-compatibility-with-ksl-extensions).
 
 These are JSON-serialized [KSIL](https://github.com/project-kessel/ksl-schema-language) namespace definitions. These go to `configs/stage/schemas/src/` (or `configs/prod/schemas/src/`) in the rbac-config repository (see: step 2: Configure output directories.) The rbac-config `ksl` compiler accepts both text `.ksl` files and JSON KSIL `.json` files.
 

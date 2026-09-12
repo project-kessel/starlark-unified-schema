@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Reserved root key holding extension references. Resources are keyed by type
+// name, so a resource of this name would collide.
+const extensionReferencesKey = "extension_references"
+
 type SpyVisitor struct {
 	root node
 }
@@ -51,6 +55,24 @@ func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonMembe
 		}
 		reporters[reporter] = data
 	}
+
+	return nil
+}
+
+func (v *SpyVisitor) VisitExtensionReference(name string, namespace string, params map[string]string) error {
+	// createNode's empty-map skip only matches map[string]any, so convert
+	// rather than let an empty params map into the golden JSON.
+	converted := make(map[string]any, len(params))
+	for key, value := range params {
+		converted[key] = value
+	}
+
+	refs, _ := v.root[extensionReferencesKey].([]any)
+	v.root[extensionReferencesKey] = append(refs, createNode(map[string]any{
+		"name":      name,
+		"namespace": namespace,
+		"params":    converted,
+	}))
 
 	return nil
 }

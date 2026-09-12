@@ -58,6 +58,8 @@ res = resource("test", common=common, id_type=uuid(), fields={
 }, permissions={
 	"operation": lambda r: r.container.allowed_users
 })
+
+call_ksl_extension("role_binding", "rbac", relation="admin")
 `)
 
 	testNS := "test"
@@ -180,6 +182,14 @@ res = resource("test", common=common, id_type=uuid(), fields={
 				Namespace: "special",
 				Name:      "container",
 				Params:    map[string]string{},
+			}},
+		},
+		"extensions.json": {
+			Name: "extensions",
+			ExtensionReferences: []*intermediate.ExtensionReference{{
+				Namespace: "rbac",
+				Name:      "role_binding",
+				Params:    map[string]string{"relation": "admin"},
 			}},
 		},
 	}, map[string]util.JsonSchemaTestCase{

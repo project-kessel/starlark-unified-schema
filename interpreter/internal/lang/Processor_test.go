@@ -1037,3 +1037,161 @@ permissions={
     }
 }`)
 }
+
+func TestProcessorEmitsExtensionReference(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "workspace/reporters/rbac/workspace.star", `
+load("kessel.star", "resource", "uuid")
+
+workspace = resource(reporter="rbac", id_type=uuid())
+
+call_ksl_extension("role_binding", "rbac", relation="admin")
+`)
+
+	spy := processAndVisit(t, processor)
+	spy.AssertJSON(t, `{
+    "workspace": {
+        "common": {},
+        "reporters": {
+            "rbac": {}
+        }
+    },
+    "extension_references": [
+        {
+            "name": "role_binding",
+            "namespace": "rbac",
+            "params": {"relation": "admin"}
+        }
+    ]
+}`)
+}
+
+func TestProcessorEmitsExtensionReferenceWithoutParams(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "workspace/reporters/rbac/workspace.star", `
+call_ksl_extension("role_binding", "rbac")
+`)
+
+	spy := processAndVisit(t, processor)
+	spy.AssertJSON(t, `{
+    "extension_references": [
+        {
+            "name": "role_binding",
+            "namespace": "rbac"
+        }
+    ]
+}`)
+}
+
+func TestProcessorCollectsExtensionReferencesAcrossModules(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "a.star", `
+call_ksl_extension("role_binding", "rbac", relation="admin")
+`)
+	util.AddFile(t, reader, "b.star", `
+call_ksl_extension("role_binding", "rbac", relation="viewer")
+`)
+
+	// Named explicitly: the in-memory reader lists files by ranging over a map,
+	// so discovery order is not stable. The real reader walks lexically.
+	spy := util.NewSpyVisitor()
+	if err := processor.Process(spy, "a.star", "b.star"); err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	spy.AssertJSON(t, `{
+    "extension_references": [
+        {
+            "name": "role_binding",
+            "namespace": "rbac",
+            "params": {"relation": "admin"}
+        },
+        {
+            "name": "role_binding",
+            "namespace": "rbac",
+            "params": {"relation": "viewer"}
+        }
+    ]
+}`)
+}
+
+// A module reached only via load() contributes no types today, and should
+// contribute no extension references either - otherwise build-shipped-schema,
+// which passes an explicit file list, would ship calls from modules it
+// deliberately excluded.
+func TestProcessorIgnoresExtensionReferencesFromUnprocessedModules(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "dependency.star", `
+call_ksl_extension("role_binding", "rbac", relation="admin")
+
+shared = 1
+`)
+	util.AddFile(t, reader, "entrypoint.star", `
+load("dependency.star", "shared")
+
+call_ksl_extension("workspace_binding", "rbac", relation="viewer")
+`)
+
+	spy := util.NewSpyVisitor()
+	if err := processor.Process(spy, "entrypoint.star"); err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	spy.AssertJSON(t, `{
+    "extension_references": [
+        {
+            "name": "workspace_binding",
+            "namespace": "rbac",
+            "params": {"relation": "viewer"}
+        }
+    ]
+}`)
+}
+
+func TestProcessorFailsOnExtensionReferenceWithMissingArguments(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "a.star", `
+call_ksl_extension("role_binding")
+`)
+
+	_, err := processAndVisitForError(t, processor)
+	assert.ErrorContains(t, err, "call_ksl_extension")
+}
+
+func TestProcessorFailsOnExtensionReferenceWithNonStringParameter(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "a.star", `
+call_ksl_extension("role_binding", "rbac", relation=1)
+`)
+
+	_, err := processAndVisitForError(t, processor)
+	assert.ErrorContains(t, err, "parameter relation must be a string")
+}
+
+func TestProcessorFailsOnExtensionReferenceWithEmptyName(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "a.star", `
+call_ksl_extension("", "rbac")
+`)
+
+	_, err := processAndVisitForError(t, processor)
+	assert.ErrorContains(t, err, "name is required")
+}
+
+func TestProcessorFailsOnExtensionReferenceWithEmptyNamespace(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+
+	util.AddFile(t, reader, "a.star", `
+call_ksl_extension("role_binding", "")
+`)
+
+	_, err := processAndVisitForError(t, processor)
+	assert.ErrorContains(t, err, "namespace is required")
+}
