@@ -1,6 +1,10 @@
 package compile
 
 import (
+	"fmt"
+	"path/filepath"
+	"sort"
+
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
 )
 
@@ -17,9 +21,23 @@ import (
 // Returns an error if parsing fails or if the visitor returns an error during
 // processing.
 func Compile(files map[string][]byte, visitor SchemaVisitor) error {
-	// Adapt the public visitor to the internal interface.
-	adapter := &visitorAdapter{visitor: visitor}
+	// No real schema path: every source file is supplied by the caller.
+	reader := lang.NewInMemorySourceFileReader("schema", "")
 
-	// Use the internal compile machinery.
-	return lang.CompileInMemory(files, adapter)
+	names := make([]string, 0, len(files))
+	for name, contents := range files {
+		if err := reader.AddFile(name, contents); err != nil {
+			return fmt.Errorf("adding %s: %w", name, err)
+		}
+		if filepath.Ext(name) == ".star" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	loader := lang.NewLoaderForReader("schema", reader)
+	processor := lang.NewProcessor(loader)
+
+	// Adapt the public visitor to the internal interface.
+	return processor.Process(&visitorAdapter{visitor: visitor}, names...)
 }

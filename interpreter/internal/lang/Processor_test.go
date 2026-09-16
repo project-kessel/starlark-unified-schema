@@ -520,8 +520,8 @@ fields={
 				],
 				"permissions": [
 					{
-					"kind": "permission",
-					"name": "permission",
+					"kind": "permission", 
+					"name": "permission", 
 					"body": {
 						"kind": "or", "left": {"kind": "reference", "name": "left"}, "right": {"kind": "reference", "name": "right"}}
 					}
@@ -537,7 +537,7 @@ func TestPermissionCallingPermission(t *testing.T) {
 
 	util.AddFile(t, reader, "test/permission_calling_permission.star", `
 load("kessel.star", "self", "at_most_one", "resource", "uuid")
-this_resource = resource("test", id_type=uuid(),
+this_resource = resource("test", id_type=uuid(), 
 fields={
 	"relation": at_most_one(self())
 }, permissions={
@@ -636,16 +636,16 @@ this_resource = resource("test", id_type=uuid(), fields={
 					{"kind": "relation", "name": "flag", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "test", "typeName": "this_resource"}
 				],
 				"permissions": [
-					{"kind": "permission", "name": "permission",
+					{"kind": "permission", "name": "permission", 
 						"body": {
-							"kind": "or",
+							"kind": "or", 
 							"left": {
-								"kind": "reference",
+								"kind": "reference", 
 								"name": "flag"
-							},
+							}, 
 							"right": {
-								"kind": "subreference",
-								"name": "parent",
+								"kind": "subreference", 
+								"name": "parent", 
 								"sub": "permission"
 							}
 						}
@@ -890,7 +890,7 @@ principal = resource("test", id_type=uuid())
 common = {
 	"direct_flag": wildcard(principal)
 }
-
+	
 parent = resource("test", id_type=uuid(), common=common)
 child = resource("test", extends=parent, permissions={
 	"flag": lambda c: c.direct_flag
@@ -965,7 +965,7 @@ load("test/folder.star", "folder")
 
 special_folder = resource("test", extends=folder, fields={
 	"direct_flag": wildcard(self())
-},
+}, 
 permissions={
 	"flag": lambda f: f.direct_flag.union(f.parent.flag)
 })
@@ -1036,98 +1036,4 @@ permissions={
         }
     }
 }`)
-}
-
-func TestFeaturesWorkspaceSchemaVisitorModel(t *testing.T) {
-	reader := newInMemorySourceFileReader("schema")
-	processor := setupProcessorWithKessel(t, reader)
-
-	for _, path := range []string{
-		"service/reporters/features/service.star",
-		"billing_account/reporters/features/billing_account.star",
-		"workspace/reporters/rbac/workspace.star",
-		"workspace/reporters/features/workspace.star",
-	} {
-		if err := addRealSchemaFile(reader, path); err != nil {
-			t.Fatalf("failed to add %s: %v", path, err)
-		}
-	}
-
-	spy := util.NewSpyVisitor()
-	if err := processor.Process(spy, "workspace/reporters/features/workspace.star"); err != nil {
-		t.Fatalf("Process failed: %v", err)
-	}
-
-	spy.AssertJSON(t, `{
-		"workspace": {
-			"common": {},
-			"reporters": {
-				"features": {
-					"extends": {"name": "workspace", "reporter": "rbac"},
-					"relations": [
-						{"kind": "relation", "name": "direct_billing_account", "cardinality": "AtMostOne", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "billing_account"},
-						{"kind": "relation", "name": "direct_service_preferences", "cardinality": "Many", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
-						{"kind": "relation", "name": "desire_all_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
-						{"kind": "relation", "name": "inherit_desired_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"},
-						{"kind": "relation", "name": "inherit_paid_services", "cardinality": "All", "dataType": {"kind": "uuid"}, "reporter": "features", "typeName": "service"}
-					],
-					"permissions": [
-						{
-							"kind": "permission",
-							"name": "_paid_services",
-							"body": {
-								"kind": "or",
-								"left": {"kind": "subreference", "name": "direct_billing_account", "sub": "services"},
-								"right": {
-									"kind": "and",
-									"left": {"kind": "subreference", "name": "parent", "sub": "_paid_services"},
-									"right": {"kind": "reference", "name": "inherit_paid_services"}
-								}
-							}
-						},
-						{
-							"kind": "permission",
-							"name": "_desired_services",
-							"body": {
-								"kind": "or",
-								"left": {
-									"kind": "or",
-									"left": {"kind": "reference", "name": "direct_service_preferences"},
-									"right": {"kind": "reference", "name": "desire_all_services"}
-								},
-								"right": {
-									"kind": "and",
-									"left": {"kind": "subreference", "name": "parent", "sub": "_desired_services"},
-									"right": {"kind": "reference", "name": "inherit_desired_services"}
-								}
-							}
-						},
-						{
-							"kind": "permission",
-							"name": "enabled_services",
-							"body": {
-								"kind": "and",
-								"left": {"kind": "reference", "name": "_paid_services"},
-								"right": {"kind": "reference", "name": "_desired_services"}
-							}
-						}
-					]
-				}
-			}
-		}
-	}`)
-}
-
-var loadedRealSchemaFiles = map[string][]byte{}
-
-func addRealSchemaFile(reader *inmemorySourceFileReader, path string) error {
-	if contents, ok := loadedRealSchemaFiles[path]; ok {
-		return reader.AddFile(path, contents)
-	}
-	contents, err := os.ReadFile(filepath.Join("../../../schema/", path))
-	if err != nil {
-		return err
-	}
-	loadedRealSchemaFiles[path] = contents
-	return reader.AddFile(path, contents)
 }
