@@ -147,7 +147,7 @@ rbac.json
 features.json
 ```
 
-If any schema file calls `call_ksl_extension(...)`, an additional `extensions.json` is written holding those references. See [ARCHITECTURE.md](ARCHITECTURE.md#backward-compatibility-with-ksl-extensions).
+`call_ksl_extension(...)` references land in the namespace named by its first argument, so the extension-only schema files at the top of `schema/` each produce a file of their own (`advisor.json`, `patch.json`, …). See [ARCHITECTURE.md](ARCHITECTURE.md#backward-compatibility-with-ksl-extensions).
 
 These are JSON-serialized [KSIL](https://github.com/project-kessel/ksl-schema-language) namespace definitions. These go to `configs/stage/schemas/src/` (or `configs/prod/schemas/src/`) in the rbac-config repository (see: step 2: Configure output directories.) The rbac-config `ksl` compiler accepts both text `.ksl` files and JSON KSIL `.json` files.
 

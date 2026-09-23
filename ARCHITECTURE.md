@@ -107,7 +107,6 @@ Resources are grouped by **type name** (the Starlark variable name, e.g. `host`)
 ```
 <KSL_OUTPUT_DIR>/
   <reporter>.json
-  extensions.json      # only when call_ksl_extension was used
 ```
 
 Example:
@@ -116,6 +115,7 @@ Example:
 output/ksl/hbi.json
 output/ksl/rbac.json
 output/ksl/features.json
+output/ksl/advisor.json   # extension references only
 ```
 
 These are copied into rbac-config at `configs/<env>/schemas/src/`. The rbac-config `ksl` compiler accepts both text `.ksl` files and JSON KSIL `.json` files.
@@ -135,7 +135,7 @@ make ksl-test-schema-stage   # writes to _private/test-schema/stage-schema.zed
 | Data fields | Ignored |
 | Relations | `intermediate.Relation` with `self` body, target namespace/name, cardinality |
 | Permissions | `intermediate.Relation` with expression body |
-| Extension calls | `intermediate.ExtensionReference` in `extensions.json` |
+| Extension calls | `intermediate.ExtensionReference` in the namespace named by the call's `reporter` argument |
 
 Resources are grouped by **reporter** (namespace), not by type name. One file per namespace contains all types defined for that reporter.
 
@@ -156,14 +156,14 @@ Cardinality `Many` is converted to legacy `Any` for KSIL compatibility.
 Starlark schema is backward-compatible with KSL extensions, which allows services to migrate ahead of services they depend upon. This is crucial because KSL is *not* forward-compatible with Starlark extensions. `call_ksl_extension` emits a reference to a KSL extension that is bound by the ksl transpiler:
 
 ```python
-call_ksl_extension("add_v1_based_permission", "rbac", app=inventory, resource=host, verb=read, v2_perm=inventory_host_view)
+call_ksl_extension("advisor", "add_v1_based_permission", "rbac", app=inventory, resource=host, verb=read, v2_perm=inventory_host_view)
 ```
 
-The first argument names the extension, the second the namespace it is *defined* in, and every keyword argument becomes an extension parameter. Parameter values must be strings.
+The first argument is the reporter whose namespace the reference is written to, the second names the extension, the third the namespace the extension is *defined* in, and every keyword argument becomes an extension parameter. All three positional arguments are required, and parameter values must be strings.
 
-It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly.
+It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly; those wrappers take the reporter as their own first argument and pass it through.
 
-All calls collect into a single synthetic `extensions` namespace, written to `extensions.json`, which holds nothing but `extension_references`. Placement does not affect what an extension generates — `Extension.Apply` resolves each of its dynamic types against the extension's own namespace, never the calling one. Identical `(namespace, name, params)` calls are deduplicated, because applying an extension twice re-adds its relations to the type it extends.
+References are grouped into the namespace named by `reporter`, alongside any types that reporter defines, and a reporter that only makes extension calls gets a namespace holding nothing but `extension_references`. Placement does not affect what an extension generates — `Extension.Apply` resolves each of its dynamic types against the extension's own namespace, never the calling one. Within a namespace, identical `(namespace, name, params)` calls are deduplicated, because applying an extension twice re-adds its relations to the type it extends; the same call under two different reporters is emitted in both.
 
 Because the extension lives in another repository, the compiler cannot check that it exists. A typo in the name or namespace surfaces downstream, in rbac-config's SpiceDB validation.
 
@@ -273,7 +273,7 @@ starlark-unified-schema uses a layered pipeline from Starlark source to disk art
 4. Output Aggregation (SchemaVisitor.Results)
    └─> JSON Schema: group by type name → common + per-reporter schemas
    └─> KSIL: group by reporter namespace → one JSON file per namespace,
-             plus extensions.json when any extension was called
+             including extension references routed by their reporter argument
         │
         ▼
 5. Write (output.WriteSchemas)
@@ -367,7 +367,7 @@ type SchemaVisitor interface {
     BeginType(name string)
     VisitResource(typeName string, reporter string, commonMembers, reporterMembers *Members) error
 
-    VisitExtensionReference(name string, namespace string, params map[string]string) error
+    VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error
 
     VisitDataField(name string, required bool, description *string, dataType any) any
 
