@@ -125,8 +125,9 @@ func (l *Loader) recordMetadata(globals starlark.StringDict) error {
 
 // recordExtensionReference buffers a call_ksl_extension made by the module
 // currently executing.
-func (l *Loader) recordExtensionReference(name string, namespace string, params map[string]string) {
+func (l *Loader) recordExtensionReference(reporter string, name string, namespace string, params map[string]string) {
 	l.extensionCalls[l.currentModule] = append(l.extensionCalls[l.currentModule], extensionReferenceCall{
+		reporter:  reporter,
 		name:      name,
 		namespace: namespace,
 		params:    params,
@@ -277,6 +278,7 @@ func (im *InmemorySourceFileReader) AddRealSchemaFile(path string) error {
 }
 
 type extensionReferenceCall struct {
+	reporter  string
 	name      string
 	namespace string
 	params    map[string]string

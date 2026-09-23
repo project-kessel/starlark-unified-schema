@@ -15,7 +15,7 @@ type SchemaVisitor interface {
 	BeginType(name string)
 	VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error
 
-	VisitExtensionReference(name string, namespace string, params map[string]string) error
+	VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error
 
 	VisitDataField(name string, required bool, description *string, dataType any) any
 

@@ -16,12 +16,6 @@ import (
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
 )
 
-// References to extensions this interpreter does not generate are collected
-// into a namespace of their own. Nothing in KSL requires them to live beside
-// the types they affect - an extension resolves each of its dynamic types
-// against its own namespace, not the calling one.
-const extensionsNamespace = "extensions"
-
 type KSILVisitor struct {
 	namespaces map[string]*intermediate.Namespace
 }
@@ -78,8 +72,8 @@ func (k *KSILVisitor) getOrCreateNamespace(name string) *intermediate.Namespace 
 	return ns
 }
 
-func (k *KSILVisitor) VisitExtensionReference(name string, namespace string, params map[string]string) error {
-	ns := k.getOrCreateNamespace(extensionsNamespace)
+func (k *KSILVisitor) VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error {
+	ns := k.getOrCreateNamespace(reporter)
 
 	// Applying an extension twice re-adds its relations to the type it
 	// extends, which fails unless the extension opted into ignoring

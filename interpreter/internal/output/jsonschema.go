@@ -22,7 +22,7 @@ func NewJSONSchemaVisitor() *JSONSchemaVisitor {
 func (v *JSONSchemaVisitor) BeginType(name string) {}
 
 // Extensions are a KSIL concept with no bearing on the data shape.
-func (v *JSONSchemaVisitor) VisitExtensionReference(name string, namespace string, params map[string]string) error {
+func (v *JSONSchemaVisitor) VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error {
 	return nil
 }
 

@@ -400,7 +400,7 @@ func TestKSILVisitorExtensionReference(t *testing.T) {
 		RelationFields: []any{r},
 	}, nil))
 
-	assert.NoError(t, v.VisitExtensionReference("role_binding", "rbac", map[string]string{"relation": "admin"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
 
 	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
 		"test.json": {
@@ -418,9 +418,6 @@ func TestKSILVisitorExtensionReference(t *testing.T) {
 					}},
 				},
 			},
-		},
-		"extensions.json": {
-			Name: "extensions",
 			ExtensionReferences: []*intermediate.ExtensionReference{{
 				Namespace: "rbac",
 				Name:      "role_binding",
@@ -433,11 +430,11 @@ func TestKSILVisitorExtensionReference(t *testing.T) {
 func TestKSILVisitorExtensionReferenceWithoutParams(t *testing.T) {
 	v := NewKSILVisitor()
 
-	assert.NoError(t, v.VisitExtensionReference("role_binding", "rbac", map[string]string{}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{}))
 
 	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
-		"extensions.json": {
-			Name: "extensions",
+		"test.json": {
+			Name: "test",
 			ExtensionReferences: []*intermediate.ExtensionReference{{
 				Namespace: "rbac",
 				Name:      "role_binding",
@@ -449,12 +446,12 @@ func TestKSILVisitorExtensionReferenceWithoutParams(t *testing.T) {
 func TestKSILVisitorDeduplicatesIdenticalExtensionReferences(t *testing.T) {
 	v := NewKSILVisitor()
 
-	assert.NoError(t, v.VisitExtensionReference("role_binding", "rbac", map[string]string{"relation": "admin"}))
-	assert.NoError(t, v.VisitExtensionReference("role_binding", "rbac", map[string]string{"relation": "admin"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
 
 	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
-		"extensions.json": {
-			Name: "extensions",
+		"test.json": {
+			Name: "test",
 			ExtensionReferences: []*intermediate.ExtensionReference{{
 				Namespace: "rbac",
 				Name:      "role_binding",
@@ -467,12 +464,12 @@ func TestKSILVisitorDeduplicatesIdenticalExtensionReferences(t *testing.T) {
 func TestKSILVisitorKeepsExtensionReferencesDifferingByParams(t *testing.T) {
 	v := NewKSILVisitor()
 
-	assert.NoError(t, v.VisitExtensionReference("role_binding", "rbac", map[string]string{"relation": "admin"}))
-	assert.NoError(t, v.VisitExtensionReference("role_binding", "rbac", map[string]string{"relation": "viewer"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "viewer"}))
 
 	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
-		"extensions.json": {
-			Name: "extensions",
+		"test.json": {
+			Name: "test",
 			ExtensionReferences: []*intermediate.ExtensionReference{
 				{
 					Namespace: "rbac",

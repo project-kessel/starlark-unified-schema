@@ -29,13 +29,16 @@ func registerDefaultBuiltins(l *Loader) {
 	// per-extension wrappers rather than this directly. Every keyword argument
 	// becomes an extension parameter.
 	l.RegisterBuiltin("call_ksl_extension", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		var name, namespace string
+		var reporter, name, namespace string
 		// kwargs is passed as nil because UnpackPositionalArgs rejects any
 		// keyword argument, and here they are all extension parameters.
-		if err := starlark.UnpackPositionalArgs("call_ksl_extension", args, nil, 2, &name, &namespace); err != nil {
+		if err := starlark.UnpackPositionalArgs("call_ksl_extension", args, nil, 3, &reporter, &name, &namespace); err != nil {
 			return nil, err
 		}
 
+		if reporter == "" {
+			return nil, fmt.Errorf("call_ksl_extension: reporter is required")
+		}
 		if name == "" {
 			return nil, fmt.Errorf("call_ksl_extension: name is required")
 		}
@@ -60,7 +63,7 @@ func registerDefaultBuiltins(l *Loader) {
 			params[key] = value
 		}
 
-		l.recordExtensionReference(name, namespace, params)
+		l.recordExtensionReference(reporter, name, namespace, params)
 		return starlark.None, nil
 	})
 }

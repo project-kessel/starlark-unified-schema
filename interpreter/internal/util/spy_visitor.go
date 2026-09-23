@@ -59,7 +59,7 @@ func (v *SpyVisitor) VisitResource(typeName string, reporter string, commonMembe
 	return nil
 }
 
-func (v *SpyVisitor) VisitExtensionReference(name string, namespace string, params map[string]string) error {
+func (v *SpyVisitor) VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error {
 	// createNode's empty-map skip only matches map[string]any, so convert
 	// rather than let an empty params map into the golden JSON.
 	converted := make(map[string]any, len(params))
@@ -69,6 +69,7 @@ func (v *SpyVisitor) VisitExtensionReference(name string, namespace string, para
 
 	refs, _ := v.root[extensionReferencesKey].([]any)
 	v.root[extensionReferencesKey] = append(refs, createNode(map[string]any{
+		"reporter":  reporter,
 		"name":      name,
 		"namespace": namespace,
 		"params":    converted,
