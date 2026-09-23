@@ -396,7 +396,7 @@ func TestKSILVisitorExtensionReference(t *testing.T) {
 
 	v.BeginType("with_relation")
 	r := v.VisitRelation("relation", "test", "with_relation", "AtMostOne", v.VisitUUIDDataType())
-	assert.NoError(t, v.VisitResource("with_relation", "test", &Members{}, &Members{
+	assert.NoError(t, v.VisitResource("with_relation", "test", &output.Members{}, &output.Members{
 		RelationFields: []any{r},
 	}, nil))
 
