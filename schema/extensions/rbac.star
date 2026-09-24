@@ -11,7 +11,6 @@ def add_v1_based_permission(reporter, app, resource, verb, v2_perm):
 
 def add_v1only_permission(reporter, perm):
     call_ksl_extension(reporter, "add_v1only_permission", "rbac", perm=perm)
-    return _make_workspace_permission_reference(perm)
 
 def add_contingent_permission(reporter, first, second, contingent):
     call_ksl_extension(reporter, "add_contingent_permission", "rbac", first=first, second=second, contingent=contingent)
