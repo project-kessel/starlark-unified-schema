@@ -40,7 +40,8 @@ def _make_ref(name, child_names):
         subrefs[subref_name] = _make_subref(name, subref_name)
 
     intersect, union, exclude = _make_logic_operators(self_ref_holder)
-    ref = struct(kind="ref", name=name, intersect=intersect, union=union, exclude=exclude, **subrefs)
+    sub = lambda n: _make_subref(self_ref_holder[0].name, n)
+    ref = struct(kind="ref", name=name, sub=sub, intersect=intersect, union=union, exclude=exclude, **subrefs)
     
     self_ref_holder[0] = ref
     return ref

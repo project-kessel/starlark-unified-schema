@@ -57,8 +57,11 @@ Use this pattern when adding or changing:
 - Data types and constraints
 - Relation cardinality and cross-resource references
 - Permission expression trees (`intersect`/`union`/`exclude`, `ref`/`subref`, `any`/`all`)
+- `call_ksl_extension` calls, which the spy records under the reserved root key `extension_references`
 
 For cross-resource relations, define or load dependency modules before modules that reference them — same ordering constraints as production `load()` imports.
+
+Pass explicit paths — `processor.Process(spy, "entrypoint.star")` — to restrict the run to specific modules, as `make build-shipped-schema` does. Do this whenever a test asserts an order-sensitive result: the in-memory reader lists files by ranging over a map, so automatic discovery order is not stable.
 
 ## Loader tests
 

@@ -391,6 +391,101 @@ func TestKSILVisitorSubclassType(t *testing.T) {
 	})
 }
 
+func TestKSILVisitorExtensionReference(t *testing.T) {
+	v := NewKSILVisitor()
+
+	v.BeginType("with_relation")
+	r := v.VisitRelation("relation", "test", "with_relation", "AtMostOne", v.VisitUUIDDataType())
+	assert.NoError(t, v.VisitResource("with_relation", "test", &output.Members{}, &output.Members{
+		RelationFields: []any{r},
+	}, nil))
+
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
+
+	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
+		"test.json": {
+			Name: "test",
+			Types: []*intermediate.Type{
+				{
+					Name: "with_relation",
+					Relations: []*intermediate.Relation{{
+						Name: "relation",
+						Body: &intermediate.RelationBody{
+							Kind:        "self",
+							Types:       []*intermediate.TypeReference{{Namespace: "test", Name: "with_relation"}},
+							Cardinality: "AtMostOne",
+						},
+					}},
+				},
+			},
+			ExtensionReferences: []*intermediate.ExtensionReference{{
+				Namespace: "rbac",
+				Name:      "role_binding",
+				Params:    map[string]string{"relation": "admin"},
+			}},
+		},
+	})
+}
+
+func TestKSILVisitorExtensionReferenceWithoutParams(t *testing.T) {
+	v := NewKSILVisitor()
+
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{}))
+
+	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
+		"test.json": {
+			Name: "test",
+			ExtensionReferences: []*intermediate.ExtensionReference{{
+				Namespace: "rbac",
+				Name:      "role_binding",
+			}},
+		},
+	})
+}
+
+func TestKSILVisitorDeduplicatesIdenticalExtensionReferences(t *testing.T) {
+	v := NewKSILVisitor()
+
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
+
+	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
+		"test.json": {
+			Name: "test",
+			ExtensionReferences: []*intermediate.ExtensionReference{{
+				Namespace: "rbac",
+				Name:      "role_binding",
+				Params:    map[string]string{"relation": "admin"},
+			}},
+		},
+	})
+}
+
+func TestKSILVisitorKeepsExtensionReferencesDifferingByParams(t *testing.T) {
+	v := NewKSILVisitor()
+
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "admin"}))
+	assert.NoError(t, v.VisitExtensionReference("test", "role_binding", "rbac", map[string]string{"relation": "viewer"}))
+
+	verifyKSILResults(t, v, map[string]*intermediate.Namespace{
+		"test.json": {
+			Name: "test",
+			ExtensionReferences: []*intermediate.ExtensionReference{
+				{
+					Namespace: "rbac",
+					Name:      "role_binding",
+					Params:    map[string]string{"relation": "admin"},
+				},
+				{
+					Namespace: "rbac",
+					Name:      "role_binding",
+					Params:    map[string]string{"relation": "viewer"},
+				},
+			},
+		},
+	})
+}
+
 func TestKSILVisitorTypeWithCommon(t *testing.T) {
 	v := NewKSILVisitor()
 

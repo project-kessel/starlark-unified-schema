@@ -10,6 +10,7 @@ package ksil
 import (
 	"bytes"
 	"fmt"
+	"maps"
 
 	"github.com/project-kessel/ksl-schema-language/pkg/intermediate"
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
@@ -55,15 +56,45 @@ func (k *KSILVisitor) BeginRelation(name string) {
 
 func (k *KSILVisitor) BeginType(name string) {}
 
-func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMembers *output.Members, reporterMembers *output.Members, extendsResource *output.ResourceTypeReference) error {
-	if _, exists := k.namespaces[reporter]; !exists {
-		k.namespaces[reporter] = &intermediate.Namespace{
-			Name:                 reporter,
-			Types:                []*intermediate.Type{},
-			ExtensionDefinitions: []*intermediate.ExtensionDefinition{},
-			ExtensionReferences:  []*intermediate.ExtensionReference{},
+func (k *KSILVisitor) getOrCreateNamespace(name string) *intermediate.Namespace {
+	if ns, exists := k.namespaces[name]; exists {
+		return ns
+	}
+
+	ns := &intermediate.Namespace{
+		Name:                 name,
+		Types:                []*intermediate.Type{},
+		ExtensionDefinitions: []*intermediate.ExtensionDefinition{},
+		ExtensionReferences:  []*intermediate.ExtensionReference{},
+	}
+	k.namespaces[name] = ns
+
+	return ns
+}
+
+func (k *KSILVisitor) VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error {
+	ns := k.getOrCreateNamespace(reporter)
+
+	// Applying an extension twice re-adds its relations to the type it
+	// extends, which fails unless the extension opted into ignoring
+	// duplicates. Calls differing in any parameter are kept.
+	for _, existing := range ns.ExtensionReferences {
+		if existing.Name == name && existing.Namespace == namespace && maps.Equal(existing.Params, params) {
+			return nil
 		}
 	}
+
+	ns.ExtensionReferences = append(ns.ExtensionReferences, &intermediate.ExtensionReference{
+		Namespace: namespace,
+		Name:      name,
+		Params:    params,
+	})
+
+	return nil
+}
+
+func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMembers *output.Members, reporterMembers *output.Members, extendsResource *output.ResourceTypeReference) error {
+	ns := k.getOrCreateNamespace(reporter)
 
 	// Convert relations from []any to []*intermediate.Relation
 	typedRelations := make([]*intermediate.Relation, 0,
@@ -83,7 +114,6 @@ func (k *KSILVisitor) VisitResource(typeName string, reporter string, commonMemb
 		typedRelations = append(typedRelations, perm.(*intermediate.Relation))
 	}
 
-	ns := k.namespaces[reporter]
 	if extendsResource != nil {
 		err := k.constructSubclassExtensionAndAddToNamespace(ns, typeName, typedRelations, extendsResource)
 		if err != nil {

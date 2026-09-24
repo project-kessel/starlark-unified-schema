@@ -115,6 +115,7 @@ Example:
 output/ksl/hbi.json
 output/ksl/rbac.json
 output/ksl/features.json
+output/ksl/advisor.json   # extension references only
 ```
 
 These are copied into rbac-config at `configs/<env>/schemas/src/`. The rbac-config `ksl` compiler accepts both text `.ksl` files and JSON KSIL `.json` files.
@@ -134,6 +135,7 @@ make ksl-test-schema-stage   # writes to _private/test-schema/stage-schema.zed
 | Data fields | Ignored |
 | Relations | `intermediate.Relation` with `self` body, target namespace/name, cardinality |
 | Permissions | `intermediate.Relation` with expression body |
+| Extension calls | `intermediate.ExtensionReference` in the namespace named by the call's `reporter` argument |
 
 Resources are grouped by **reporter** (namespace), not by type name. One file per namespace contains all types defined for that reporter.
 
@@ -148,6 +150,24 @@ Resources are grouped by **reporter** (namespace), not by type name. One file pe
 | `subref` | `nested_reference` |
 
 Cardinality `Many` is converted to legacy `Any` for KSIL compatibility.
+
+### Backward-compatibility with KSL extensions
+
+Starlark schema is backward-compatible with KSL extensions, which allows services to migrate ahead of services they depend upon. This is crucial because KSL is *not* forward-compatible with Starlark extensions. `call_ksl_extension` emits a reference to a KSL extension that is bound by the ksl transpiler:
+
+```python
+call_ksl_extension("advisor", "add_v1_based_permission", "rbac", app=inventory, resource=host, verb=read, v2_perm=inventory_host_view)
+```
+
+The first argument is the reporter whose namespace the reference is written to, the second names the extension, the third the namespace the extension is *defined* in, and every keyword argument becomes an extension parameter. All three positional arguments are required, and parameter values must be strings.
+
+It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly; those wrappers take the reporter as their own first argument and pass it through.
+
+References are grouped into the namespace named by `reporter`, alongside any types that reporter defines, and a reporter that only makes extension calls gets a namespace holding nothing but `extension_references`. Placement does not affect what an extension generates — `Extension.Apply` resolves each of its dynamic types against the extension's own namespace, never the calling one. Within a namespace, identical `(namespace, name, params)` calls are deduplicated, because applying an extension twice re-adds its relations to the type it extends; the same call under two different reporters is emitted in both.
+
+Because the extension lives in another repository, the compiler cannot check that it exists. A typo in the name or namespace surfaces downstream, in rbac-config's SpiceDB validation.
+
+Calls are recorded while a module executes and drained when that module is processed, so a module reached only via `load()` contributes nothing — the same rule that applies to its resources.
 
 ## Project Structure
 
@@ -168,7 +188,7 @@ starlark-unified-schema/
 │   │   ├── lang/                        # Starlark loading and semantic processing
 │   │   │   ├── Loader.go                # Module execution, caching, metadata registry
 │   │   │   ├── Processor.go             # Resource walk, visitor dispatch
-│   │   │   ├── Builtins.go              # Predeclared builtins (struct, println)
+│   │   │   ├── Builtins.go              # Predeclared builtins (struct, println, call_ksl_extension)
 │   │   │   └── Util.go                  # Starlark struct/dict helpers
 │   │   │
 │   │   ├── output/                      # Visitor implementations and writer
@@ -247,11 +267,13 @@ starlark-unified-schema uses a layered pipeline from Starlark source to disk art
    └─> Visit reporter-specific fields
    └─> Resolve cross-resource relation targets via metadata registry
    └─> Walk permission expression trees (and/or/unless/ref/subref)
+   └─> Drain call_ksl_extension calls the module made while it executed
         │
         ▼
 4. Output Aggregation (SchemaVisitor.Results)
    └─> JSON Schema: group by type name → common + per-reporter schemas
-   └─> KSIL: group by reporter namespace → one JSON file per namespace
+   └─> KSIL: group by reporter namespace → one JSON file per namespace,
+             including extension references routed by their reporter argument
         │
         ▼
 5. Write (output.WriteSchemas)
@@ -260,7 +282,7 @@ starlark-unified-schema uses a layered pipeline from Starlark source to disk art
 
 ### Starlark DSL
 
-The DSL lives in `schema/kessel.star` and is plain Starlark — no custom interpreter builtins beyond `struct` and standard `load()`.
+The DSL lives in `schema/kessel.star` and is plain Starlark — the only custom interpreter builtins are `struct`, `println`, and `call_ksl_extension`; everything else is standard `load()`.
 
 | Construct | Role |
 |-----------|------|
@@ -345,6 +367,8 @@ type SchemaVisitor interface {
     BeginType(name string)
     VisitResource(typeName string, reporter string, commonMembers, reporterMembers *Members) error
 
+    VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error
+
     VisitDataField(name string, required bool, description *string, dataType any) any
 
     VisitTextDataType(minLength, maxLength *int, regex *string) any
@@ -390,7 +414,7 @@ type OutputEntry struct {
 
 **Implementations**:
 
-- `JSONSchemaVisitor` — Draft-07 JSON Schema; ignores permission callbacks
+- `JSONSchemaVisitor` — Draft-07 JSON Schema; ignores permission and extension callbacks
 - `KSILVisitor` — KSIL namespace JSON via `ksl-schema-language`; ignores data field callbacks
 - `SpyVisitor` (test) — Captures visitor calls and can compare results against a JSON representation
 
@@ -412,7 +436,7 @@ func (l *Loader) SetMetadata(metadata map[resourceType]meta)
 - `Thread.Load` callback resolves `load()` imports
 - Records `reporter`, type name, and `id_type` for each resource on load
 
-**Builtins** (`Builtins.go`): `struct` (from starlarkstruct), `println` (debug)
+**Builtins** (`Builtins.go`): `struct` (from starlarkstruct), `println` (debug), `call_ksl_extension` (see [Backward-compatibility with KSL extensions](#backward-compatibility-with-ksl-extensions))
 
 ### lang.Processor
 

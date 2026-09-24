@@ -15,6 +15,10 @@ type visitorAdapter struct {
 // Verify that visitorAdapter implements output.SchemaVisitor at compile time.
 var _ output.SchemaVisitor = (*visitorAdapter)(nil)
 
+func (a *visitorAdapter) VisitExtensionReference(reporter string, name string, namespace string, params map[string]string) error {
+	return nil
+}
+
 func (a *visitorAdapter) BeginType(name string) {
 	a.visitor.BeginType(name)
 }
