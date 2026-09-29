@@ -363,6 +363,10 @@ func TestJSONSchemaVisitorRelationFields(t *testing.T) {
 				}`,
 				`{
 					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
+					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"]
+				}`,
+				`{
+					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
 					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"],
 					"wildcard": "test/other:*"
 				}`,
@@ -374,12 +378,67 @@ func TestJSONSchemaVisitorRelationFields(t *testing.T) {
 				`{
 					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
 					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"],
-					"wildcard": "test/some:*"
+					"wildcard": true
+				}`,
+				`{
+					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
+					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"],
+					"wildcard": false
+				}`,
+				`{
+					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
+					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"],
+					"wildcard": "test/not_other:*"
+				}`,
+				`{
+					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
+					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"],
+					"wildcard": "true"
+				}`,
+				`{
+					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
+					"at_least_one": ["9bcd4eec-9d9d-11f1-8f44-6ae246604903"],
+					"wildcard": 1
 				}`,
 				`{
 					"one": "9bcd4eec-9d9d-11f1-8f44-6ae246604903",
 					"at_least_one": []
 				}`,
+			},
+		},
+	})
+}
+
+func TestJSONSchemaVisitorBooleanWildcardRelation(t *testing.T) {
+	v := NewJSONSchemaVisitor()
+
+	booleanWildcard, err := v.VisitBooleanWildcardRelation("wildcard", "test", "other", v.VisitUUIDDataType())
+	if !assert.NoError(t, err, "error visiting boolean wildcard relation") {
+		return
+	}
+	if !assert.NotNil(t, booleanWildcard) {
+		return
+	}
+
+	assert.NoError(t, v.VisitResource("with_boolean_wildcard", "test", nil, &Members{
+		RelationFields: []any{booleanWildcard},
+	}, nil))
+
+	verifyJSONSchemaResults(t, v, map[string]jsonSchemaTestCase{
+		"with_boolean_wildcard/common_representation.json": {
+			valid:   []string{`{}`},
+			invalid: []string{`{"other": "foo"}`},
+		},
+		"with_boolean_wildcard/reporters/test/with_boolean_wildcard.json": {
+			valid: []string{
+				`{}`,
+				`{"wildcard": true}`,
+				`{"wildcard": false}`,
+			},
+			invalid: []string{
+				`{"wildcard": "test/other:*"}`,
+				`{"wildcard": "true"}`,
+				`{"wildcard": 1}`,
 			},
 		},
 	})

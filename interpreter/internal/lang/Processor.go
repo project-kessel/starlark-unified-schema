@@ -226,7 +226,39 @@ func (p *Processor) visitMembers(self *starlarkstruct.Struct, fields *starlark.D
 			if err != nil {
 				return nil, fmt.Errorf("error visiting id type for relation %s: %w", fieldName, err)
 			}
-			relationFields = append(relationFields, visitor.VisitRelation(fieldName, metadata.reporter, metadata.typeName, cardinality, idType))
+
+			inputAnnotated := false
+			for _, attrName := range fieldStruct.AttrNames() {
+				if attrName == "input" {
+					inputAnnotated = true
+					break
+				}
+			}
+			if !inputAnnotated {
+				relationFields = append(relationFields, visitor.VisitRelation(fieldName, metadata.reporter, metadata.typeName, cardinality, idType))
+				continue
+			}
+
+			if cardinality != "All" {
+				return nil, fmt.Errorf("relation %s: boolean-backed inputs are only supported for wildcard relations", fieldName)
+			}
+			inputType, err := fieldStruct.Attr("input")
+			if err != nil {
+				return nil, fmt.Errorf("error getting input for wildcard relation %s: %w", fieldName, err)
+			}
+			if err := validateBooleanWildcardInput(inputType); err != nil {
+				return nil, fmt.Errorf("wildcard relation %s input must be boolean(): %w", fieldName, err)
+			}
+
+			booleanWildcardVisitor, ok := visitor.(output.BooleanWildcardVisitor)
+			if !ok {
+				return nil, fmt.Errorf("visitor %T does not support boolean wildcard relation %s", visitor, fieldName)
+			}
+			visitedRelation, err := booleanWildcardVisitor.VisitBooleanWildcardRelation(fieldName, metadata.reporter, metadata.typeName, idType)
+			if err != nil {
+				return nil, fmt.Errorf("error visiting boolean wildcard relation %s: %w", fieldName, err)
+			}
+			relationFields = append(relationFields, visitedRelation)
 		case "permission":
 			bodyStruct, err := getStructAttr("body", fieldStruct)
 			if err != nil {
@@ -247,6 +279,29 @@ func (p *Processor) visitMembers(self *starlarkstruct.Struct, fields *starlark.D
 		RelationFields: relationFields,
 		Permissions:    permissions,
 	}, nil
+}
+
+// validateBooleanWildcardInput accepts the canonical boolean() data type shape
+// stored separately on a boolean(target) wildcard relation.
+func validateBooleanWildcardInput(inputType starlark.Value) error {
+	typeStruct, ok := inputType.(*starlarkstruct.Struct)
+	if !ok {
+		return fmt.Errorf("expected boolean() data type struct, got %s", inputType.Type())
+	}
+
+	attrNames := typeStruct.AttrNames()
+	if len(attrNames) != 1 || attrNames[0] != "kind" {
+		return fmt.Errorf("malformed boolean() data type struct")
+	}
+
+	kind, err := getStringAttr("kind", typeStruct)
+	if err != nil {
+		return err
+	}
+	if kind != "boolean" {
+		return fmt.Errorf("got %q data type", kind)
+	}
+	return nil
 }
 
 func resolveResourceTypeReference(self *starlarkstruct.Struct, typeStruct *starlarkstruct.Struct) (*starlarkstruct.Struct, error) {

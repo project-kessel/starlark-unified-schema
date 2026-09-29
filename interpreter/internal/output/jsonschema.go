@@ -233,14 +233,16 @@ func (v *JSONSchemaVisitor) VisitRelation(name string, reporter string, typeName
 		arrayType := v.VisitArrayDataType(idType)
 		return v.VisitDataField(name, false, nil, arrayType)
 	case "All":
-		wildcardType := v.VisitTextDataType(nil, nil, stringPtr(fmt.Sprintf(`^%s/%s:\*$`, reporter, typeName)))
-		return v.VisitDataField(name, false, nil, wildcardType)
+		wildcardPattern := fmt.Sprintf(`^%s/%s:\*$`, reporter, typeName)
+		return v.VisitDataField(name, false, nil, v.VisitTextDataType(nil, nil, &wildcardPattern))
 	}
 	return nil
 }
 
-func stringPtr(s string) *string {
-	return &s
+// VisitBooleanWildcardRelation renders a boolean-backed wildcard relation as
+// an optional boolean input field.
+func (v *JSONSchemaVisitor) VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error) {
+	return v.VisitDataField(name, false, nil, v.VisitBooleanDataType()), nil
 }
 
 func (v *JSONSchemaVisitor) BeginPermission(name string) {}

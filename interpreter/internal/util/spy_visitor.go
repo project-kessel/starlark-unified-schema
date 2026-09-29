@@ -18,6 +18,7 @@ type SpyVisitor struct {
 }
 
 var _ output.SchemaVisitor = (*SpyVisitor)(nil)
+var _ output.BooleanWildcardVisitor = (*SpyVisitor)(nil)
 
 func NewSpyVisitor() *SpyVisitor {
 	return &SpyVisitor{
@@ -148,6 +149,18 @@ func (v *SpyVisitor) VisitSubReferenceExpression(name string, sub string) any {
 
 func (v *SpyVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, dataType any) any {
 	return createNode(map[string]any{"kind": "relation", "name": name, "reporter": reporter, "typeName": typeName, "cardinality": cardinality, "dataType": dataType})
+}
+
+func (v *SpyVisitor) VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error) {
+	return createNode(map[string]any{
+		"kind":        "relation",
+		"name":        name,
+		"reporter":    reporter,
+		"typeName":    typeName,
+		"cardinality": "All",
+		"dataType":    idType,
+		"input":       createNode(map[string]any{"kind": "boolean"}),
+	}), nil
 }
 
 func (v *SpyVisitor) BeginPermission(name string) {

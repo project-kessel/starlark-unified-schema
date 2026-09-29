@@ -69,6 +69,17 @@ func TestKSILVisitorWildcardRelation(t *testing.T) {
 	})
 }
 
+func TestKSILVisitorBooleanWildcardRelationMatchesWildcard(t *testing.T) {
+	v := NewKSILVisitor()
+	idType := v.VisitUUIDDataType()
+
+	legacy := v.VisitRelation("all_services", "features", "service", "All", idType)
+	annotated, err := v.VisitBooleanWildcardRelation("all_services", "features", "service", idType)
+
+	assert.NoError(t, err)
+	assert.Equal(t, legacy, annotated)
+}
+
 func TestKSILVisitorRelationWithPermission(t *testing.T) {
 	v := NewKSILVisitor()
 

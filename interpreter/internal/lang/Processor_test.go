@@ -3,8 +3,10 @@ package lang
 import (
 	"testing"
 
+	"github.com/project-kessel/starlark-unified-schema/internal/output"
 	"github.com/project-kessel/starlark-unified-schema/internal/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupProcessorWithKessel(t *testing.T) (*Processor, *InmemorySourceFileReader) {
@@ -1210,4 +1212,110 @@ call_ksl_extension("", "test", "role_binding")
 
 	_, err := processAndVisitForError(t, processor)
 	assert.ErrorContains(t, err, "reporter is required")
+}
+
+func TestProcessorPreservesLegacyRelationCallbackForUnannotatedWildcard(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+	util.AddFile(t, reader, "test/unannotated_wildcard.star", `
+load("kessel.star", "resource", "uuid", "wildcard", "self")
+
+this_resource = resource("test", id_type=uuid(), fields={
+    "flag": wildcard(self()),
+})
+`)
+
+	spy := util.NewSpyVisitor()
+	visitor := &legacyCountingVisitor{SchemaVisitor: spy}
+	err := processor.Process(visitor)
+	require.NoError(t, err)
+	assert.Equal(t, 1, visitor.relationCalls)
+	spy.AssertJSON(t, `{
+		"this_resource": {
+			"common": {},
+			"reporters": {
+				"test": {
+					"relations": [{"kind":"relation", "name":"flag", "reporter":"test", "typeName":"this_resource", "cardinality":"All", "dataType":{"kind":"uuid"}}]
+				}
+			}
+		}
+	}`)
+}
+
+func TestProcessorForwardsBooleanWildcardSeparatelyFromTargetIDType(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+	util.AddFile(t, reader, "test/boolean_wildcard.star", `
+load("kessel.star", "resource", "uuid", "text", "boolean")
+
+service = resource("features", id_type=text())
+workspace = resource("rbac", id_type=uuid(), fields={
+    "service": boolean(service),
+})
+`)
+
+	spy := processAndVisit(t, processor)
+	spy.AssertJSON(t, `{
+		"service": {"common": {}, "reporters": {"features": {}}},
+		"workspace": {
+			"common": {},
+			"reporters": {
+				"rbac": {
+					"relations": [{"kind":"relation", "name":"service", "reporter":"features", "typeName":"service", "cardinality":"All", "dataType":{"kind":"text"}, "input":{"kind":"boolean"}}]
+				}
+			}
+		}
+	}`)
+}
+
+func TestProcessorRejectsBooleanWildcardForLegacyVisitor(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+	util.AddFile(t, reader, "test/unsupported_visitor.star", `
+load("kessel.star", "resource", "uuid", "boolean", "self")
+
+this_resource = resource("test", id_type=uuid(), fields={
+    "flag": boolean(self()),
+})
+`)
+
+	spy := util.NewSpyVisitor()
+	visitor := &legacyCountingVisitor{SchemaVisitor: spy}
+	err := processor.Process(visitor)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "does not support boolean wildcard relation flag")
+	assert.Zero(t, visitor.relationCalls, "annotated relations must not fall back to VisitRelation")
+}
+
+func TestBooleanWildcardRemainsAvailableToPermissionProxy(t *testing.T) {
+	processor, reader := setupProcessorWithKessel(t)
+	util.AddFile(t, reader, "test/boolean_wildcard_permission.star", `
+load("kessel.star", "resource", "uuid", "boolean", "self")
+
+this_resource = resource("test", id_type=uuid(), fields={
+    "enabled": boolean(self()),
+}, permissions={
+    "can_use": lambda r: r.enabled,
+})
+`)
+
+	spy := processAndVisit(t, processor)
+	spy.AssertJSON(t, `{
+		"this_resource": {
+			"common": {},
+			"reporters": {
+				"test": {
+					"relations": [{"kind":"relation", "name":"enabled", "reporter":"test", "typeName":"this_resource", "cardinality":"All", "dataType":{"kind":"uuid"}, "input":{"kind":"boolean"}}],
+					"permissions": [{"kind":"permission", "name":"can_use", "body":{"kind":"reference", "name":"enabled"}}]
+				}
+			}
+		}
+	}`)
+}
+
+type legacyCountingVisitor struct {
+	output.SchemaVisitor
+	relationCalls int
+}
+
+func (v *legacyCountingVisitor) VisitRelation(name, reporter, typeName, cardinality string, idType any) any {
+	v.relationCalls++
+	return v.SchemaVisitor.VisitRelation(name, reporter, typeName, cardinality, idType)
 }

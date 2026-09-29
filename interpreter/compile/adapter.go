@@ -1,6 +1,8 @@
 package compile
 
 import (
+	"fmt"
+
 	"github.com/project-kessel/starlark-unified-schema/internal/output"
 )
 
@@ -120,6 +122,14 @@ func (a *visitorAdapter) VisitSubReferenceExpression(name string, sub string) an
 
 func (a *visitorAdapter) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any {
 	return a.visitor.VisitRelation(name, reporter, typeName, cardinality, idType)
+}
+
+func (a *visitorAdapter) VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error) {
+	visitor, ok := a.visitor.(BooleanWildcardVisitor)
+	if !ok {
+		return nil, fmt.Errorf("visitor %T does not support boolean wildcard relations", a.visitor)
+	}
+	return visitor.VisitBooleanWildcardRelation(name, reporter, typeName, idType)
 }
 
 func (a *visitorAdapter) BeginPermission(name string) {

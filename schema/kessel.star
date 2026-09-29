@@ -154,8 +154,11 @@ def uuid():
 def numeric_id(min=None, max=None):
     return struct(kind="numeric_id", min=min, max=max)
 
-def boolean():
-    return struct(kind="boolean")
+def boolean(target=None):
+    """Return a boolean data type, or a boolean-backed wildcard relation."""
+    if target == None:
+        return struct(kind="boolean")
+    return struct(kind="relation", cardinality="All", type=target, input=struct(kind="boolean"))
 
 def date_time():
     return struct(kind="date_time")

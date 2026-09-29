@@ -1,4 +1,4 @@
-load("kessel.star", "resource", "at_most_one", "many", "wildcard", "any", "uuid")
+load("kessel.star", "resource", "at_most_one", "many", "boolean", "any", "uuid")
 load("billing_account/reporters/features/billing_account.star", "billing_account")
 load("service/reporters/features/service.star", "service")
 load("workspace/reporters/rbac/workspace.star", rbac_workspace="workspace")
@@ -6,9 +6,9 @@ load("workspace/reporters/rbac/workspace.star", rbac_workspace="workspace")
 workspace = resource("features", extends=rbac_workspace, fields={
     "direct_billing_account": at_most_one(billing_account),
     "direct_service_preferences": many(service),
-    "desire_all_services": wildcard(service),
-    "ignore_inherited_desired_services": wildcard(service),
-    "ignore_inherited_paid_services": wildcard(service)
+    "desire_all_services": boolean(service),
+    "ignore_inherited_desired_services": boolean(service),
+    "ignore_inherited_paid_services": boolean(service)
 }, permissions={
     "_paid_services": lambda w: any(
         w.direct_billing_account.services,

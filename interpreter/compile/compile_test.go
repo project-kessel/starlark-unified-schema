@@ -15,6 +15,7 @@ package compile
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -26,7 +27,8 @@ import (
 // testSpyVisitor implements SchemaVisitor for testing purposes.
 // It captures all visitor calls in a structured format for JSON comparison.
 type testSpyVisitor struct {
-	root node
+	root           node
+	relationVisits int
 }
 
 type node map[string]any
@@ -47,8 +49,8 @@ func (v *testSpyVisitor) VisitResource(typeName string, reporter string, commonM
 	}
 	if commonMembers != nil && entry["common"] == nil {
 		entry["common"] = createNode(map[string]any{
-			"fields":    commonMembers.DataFields,
-			"relations": commonMembers.RelationFields,
+			"fields":      commonMembers.DataFields,
+			"relations":   commonMembers.RelationFields,
 			"permissions": commonMembers.Permissions,
 		})
 	}
@@ -144,6 +146,7 @@ func (v *testSpyVisitor) VisitSubReferenceExpression(name string, sub string) an
 }
 
 func (v *testSpyVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any {
+	v.relationVisits++
 	return createNode(map[string]any{
 		"kind":        "relation",
 		"name":        name,
@@ -411,7 +414,7 @@ example = resource(
         "text_field": field(text(minLength=1, maxLength=100, regex="^[a-z]+$")),
         "uuid_field": field(uuid()),
         "numeric_field": field(numeric_id(min=1, max=1000)),
-        "bool_field": field(boolean()),
+        "bool_field": field(type=boolean()),
         "datetime_field": field(date_time()),
         "enum_field": field(enum(["active", "inactive"])),
         "nullable_field": field(nullable(text())),
@@ -437,8 +440,18 @@ example = resource(
 	testReporter := reporters["test"].(node)
 	fields := testReporter["fields"].([]any)
 
-	// Should have all 9 fields
+	// Should have all 9 fields, including boolean() as a data-only type.
 	assert.Len(t, fields, 9)
+	booleanFieldFound := false
+	for _, field := range fields {
+		dataField := field.(node)
+		if dataField["name"] == "bool_field" {
+			assert.Equal(t, node{"kind": "boolean"}, dataField["type"])
+			booleanFieldFound = true
+			break
+		}
+	}
+	assert.True(t, booleanFieldFound, "expected the boolean data field")
 }
 
 func TestCompile_MissingKesselStar(t *testing.T) {
@@ -618,6 +631,203 @@ workspace = resource(
 	assert.Equal(t, "ExactlyOne", cardinalities["owner"])
 	assert.Equal(t, "Many", cardinalities["members"])
 	assert.Equal(t, "AtLeastOne", cardinalities["viewers"])
+}
+
+func TestCompile_UnannotatedWildcardUsesLegacyRelationCallback(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "wildcard", "self")
+
+service = resource("features", id_type=uuid())
+workspace = resource("rbac", id_type=uuid(), fields={
+    "service": wildcard(service),
+})
+`
+	visitor := newTestSpyVisitor()
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.NoError(t, err)
+	assert.Equal(t, 1, visitor.relationVisits)
+	visitor.assertJSON(t, `{
+		"service": {"common": {}, "reporters": {"features": {}}},
+		"workspace": {"common": {}, "reporters": {"rbac": {
+			"relations": [{"kind":"relation", "name":"service", "reporter":"features", "typeName":"service", "cardinality":"All", "dataType":{"kind":"uuid"}}]
+		}}
+		}
+	}`)
+}
+
+func TestCompile_ForwardsBooleanWildcardToOptionalVisitor(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "text", "wildcard", "boolean")
+
+service = resource("features", id_type=text())
+workspace = resource("rbac", id_type=uuid(), fields={
+    "service": boolean(service),
+})
+`
+	visitor := &booleanWildcardTestVisitor{testSpyVisitor: newTestSpyVisitor()}
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.NoError(t, err)
+	assert.Equal(t, 1, visitor.booleanWildcardVisits)
+	assert.Zero(t, visitor.relationVisits, "annotated relation must use the optional callback")
+	visitor.assertJSON(t, `{
+		"service": {"common": {}, "reporters": {"features": {}}},
+		"workspace": {"common": {}, "reporters": {"rbac": {
+			"relations": [{"kind":"relation", "name":"service", "reporter":"features", "typeName":"service", "cardinality":"All", "dataType":{"kind":"text"}, "input":{"kind":"boolean"}}]
+		}}
+		}
+	}`)
+}
+
+func TestCompile_RejectsWildcardInputKeyword(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "wildcard", "boolean", "self")
+
+workspace = resource("rbac", id_type=uuid(), fields={
+    "enabled": wildcard(self(), input=boolean()),
+})
+`
+	visitor := &booleanWildcardTestVisitor{testSpyVisitor: newTestSpyVisitor()}
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "input")
+}
+
+func TestCompile_BooleanDataTypeRemainsAvailableForDataFields(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "field", "boolean")
+
+workspace = resource("rbac", id_type=uuid(), fields={
+    "enabled": field(type=boolean()),
+})
+`
+	visitor := newTestSpyVisitor()
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.NoError(t, err)
+	visitor.assertJSON(t, `{
+		"workspace": {"common": {}, "reporters": {"rbac": {
+			"fields": [{"name":"enabled", "required":false, "type":{"kind":"boolean"}}]
+		}}}
+	}`)
+}
+
+func TestCompile_RejectsBooleanWildcardForVisitorWithoutCapability(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "wildcard", "boolean", "self")
+
+workspace = resource("rbac", id_type=uuid(), fields={
+    "enabled": boolean(self()),
+})
+`
+	visitor := newTestSpyVisitor()
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "does not support boolean wildcard relations")
+	assert.Zero(t, visitor.relationVisits, "annotated relation must not fall back to VisitRelation")
+}
+
+func TestCompile_PropagatesBooleanWildcardVisitorError(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "wildcard", "boolean", "self")
+
+workspace = resource("rbac", id_type=uuid(), fields={
+    "enabled": boolean(self()),
+})
+`
+	sentinel := errors.New("boolean wildcard visitor failed")
+	visitor := &sentinelBooleanWildcardTestVisitor{
+		testSpyVisitor: newTestSpyVisitor(),
+		err:            sentinel,
+	}
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, sentinel), "Compile should wrap and preserve the visitor error")
+	assert.Equal(t, 1, visitor.visits)
+	assert.Zero(t, visitor.relationVisits, "annotated relation must not fall back to VisitRelation")
+}
+
+func TestCompile_PermissionProxySeesBooleanWildcardAsRelation(t *testing.T) {
+	kessel := loadKesselStar(t)
+	schema := `
+load("kessel.star", "resource", "uuid", "wildcard", "boolean", "self")
+
+workspace = resource("rbac", id_type=uuid(), fields={
+    "enabled": boolean(self()),
+}, permissions={
+    "can_use": lambda r: r.enabled,
+})
+`
+	visitor := &booleanWildcardTestVisitor{testSpyVisitor: newTestSpyVisitor()}
+	err := Compile(map[string][]byte{
+		"kessel.star": kessel,
+		"test.star":   []byte(schema),
+	}, visitor)
+	require.NoError(t, err)
+	visitor.assertJSON(t, `{
+		"workspace": {"common": {}, "reporters": {"rbac": {
+			"relations": [{"kind":"relation", "name":"enabled", "reporter":"rbac", "typeName":"workspace", "cardinality":"All", "dataType":{"kind":"uuid"}, "input":{"kind":"boolean"}}],
+			"permissions": [{"kind":"permission", "name":"can_use", "body":{"kind":"reference", "name":"enabled"}}]
+		}}
+		}
+	}`)
+}
+
+type booleanWildcardTestVisitor struct {
+	*testSpyVisitor
+	booleanWildcardVisits int
+}
+
+var _ SchemaVisitor = (*booleanWildcardTestVisitor)(nil)
+var _ BooleanWildcardVisitor = (*booleanWildcardTestVisitor)(nil)
+
+func (v *booleanWildcardTestVisitor) VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error) {
+	v.booleanWildcardVisits++
+	return createNode(map[string]any{
+		"kind":        "relation",
+		"name":        name,
+		"reporter":    reporter,
+		"typeName":    typeName,
+		"cardinality": "All",
+		"dataType":    idType,
+		"input":       createNode(map[string]any{"kind": "boolean"}),
+	}), nil
+}
+
+type sentinelBooleanWildcardTestVisitor struct {
+	*testSpyVisitor
+	err    error
+	visits int
+}
+
+var _ SchemaVisitor = (*sentinelBooleanWildcardTestVisitor)(nil)
+var _ BooleanWildcardVisitor = (*sentinelBooleanWildcardTestVisitor)(nil)
+
+func (v *sentinelBooleanWildcardTestVisitor) VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error) {
+	v.visits++
+	return nil, v.err
 }
 
 func TestCompile_PermissionExpressions(t *testing.T) {
@@ -946,30 +1156,38 @@ type errorReturningVisitor struct {
 	expectedErr error
 }
 
-func (v *errorReturningVisitor) BeginType(name string)                                                                                     {}
+func (v *errorReturningVisitor) BeginType(name string) {}
 func (v *errorReturningVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error {
 	return v.expectedErr
 }
-func (v *errorReturningVisitor) VisitDataField(name string, required bool, description *string, dataType any) any { return nil }
-func (v *errorReturningVisitor) VisitTextDataType(minLength *int, maxLength *int, regex *string) any               { return nil }
-func (v *errorReturningVisitor) VisitUUIDDataType() any                                                             { return nil }
-func (v *errorReturningVisitor) VisitNumericIDDataType(min *int, max *int) any                                      { return nil }
-func (v *errorReturningVisitor) VisitBooleanDataType() any                                                          { return nil }
-func (v *errorReturningVisitor) VisitDateTimeDataType() any                                                         { return nil }
-func (v *errorReturningVisitor) VisitEnumDataType(values []string) any                                              { return nil }
-func (v *errorReturningVisitor) VisitNullableDataType(inner any) any                                                { return nil }
-func (v *errorReturningVisitor) VisitCompositeDataType(dataTypes []any) any                                         { return nil }
-func (v *errorReturningVisitor) VisitArrayDataType(items any) any                                                   { return nil }
-func (v *errorReturningVisitor) VisitObjectDataType(properties []any, required []string) any                        { return nil }
-func (v *errorReturningVisitor) VisitAnd(left any, right any) any                                                   { return nil }
-func (v *errorReturningVisitor) VisitOr(left any, right any) any                                                    { return nil }
-func (v *errorReturningVisitor) VisitUnless(left any, right any) any                                                { return nil }
-func (v *errorReturningVisitor) VisitReferenceExpression(name string) any                                           { return nil }
-func (v *errorReturningVisitor) VisitSubReferenceExpression(name string, sub string) any                            { return nil }
-func (v *errorReturningVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any { return nil }
-func (v *errorReturningVisitor) BeginPermission(name string)                                                        {}
-func (v *errorReturningVisitor) VisitPermission(name string, body any) any                                          { return nil }
-func (v *errorReturningVisitor) Results() ([]OutputEntry, error)                                                    { return nil, nil }
+func (v *errorReturningVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {
+	return nil
+}
+func (v *errorReturningVisitor) VisitTextDataType(minLength *int, maxLength *int, regex *string) any {
+	return nil
+}
+func (v *errorReturningVisitor) VisitUUIDDataType() any                        { return nil }
+func (v *errorReturningVisitor) VisitNumericIDDataType(min *int, max *int) any { return nil }
+func (v *errorReturningVisitor) VisitBooleanDataType() any                     { return nil }
+func (v *errorReturningVisitor) VisitDateTimeDataType() any                    { return nil }
+func (v *errorReturningVisitor) VisitEnumDataType(values []string) any         { return nil }
+func (v *errorReturningVisitor) VisitNullableDataType(inner any) any           { return nil }
+func (v *errorReturningVisitor) VisitCompositeDataType(dataTypes []any) any    { return nil }
+func (v *errorReturningVisitor) VisitArrayDataType(items any) any              { return nil }
+func (v *errorReturningVisitor) VisitObjectDataType(properties []any, required []string) any {
+	return nil
+}
+func (v *errorReturningVisitor) VisitAnd(left any, right any) any                        { return nil }
+func (v *errorReturningVisitor) VisitOr(left any, right any) any                         { return nil }
+func (v *errorReturningVisitor) VisitUnless(left any, right any) any                     { return nil }
+func (v *errorReturningVisitor) VisitReferenceExpression(name string) any                { return nil }
+func (v *errorReturningVisitor) VisitSubReferenceExpression(name string, sub string) any { return nil }
+func (v *errorReturningVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any {
+	return nil
+}
+func (v *errorReturningVisitor) BeginPermission(name string)               {}
+func (v *errorReturningVisitor) VisitPermission(name string, body any) any { return nil }
+func (v *errorReturningVisitor) Results() ([]OutputEntry, error)           { return nil, nil }
 
 // resultsReturningVisitor is a visitor that returns configured results.
 type resultsReturningVisitor struct {
@@ -977,29 +1195,39 @@ type resultsReturningVisitor struct {
 	resultsErr error
 }
 
-func (v *resultsReturningVisitor) BeginType(name string)                                                             {}
+func (v *resultsReturningVisitor) BeginType(name string) {}
 func (v *resultsReturningVisitor) VisitResource(typeName string, reporter string, commonMembers *Members, reporterMembers *Members, extendsResource *ResourceTypeReference) error {
 	return nil
 }
-func (v *resultsReturningVisitor) VisitDataField(name string, required bool, description *string, dataType any) any { return nil }
-func (v *resultsReturningVisitor) VisitTextDataType(minLength *int, maxLength *int, regex *string) any               { return nil }
-func (v *resultsReturningVisitor) VisitUUIDDataType() any                                                             { return nil }
-func (v *resultsReturningVisitor) VisitNumericIDDataType(min *int, max *int) any                                      { return nil }
-func (v *resultsReturningVisitor) VisitBooleanDataType() any                                                          { return nil }
-func (v *resultsReturningVisitor) VisitDateTimeDataType() any                                                         { return nil }
-func (v *resultsReturningVisitor) VisitEnumDataType(values []string) any                                              { return nil }
-func (v *resultsReturningVisitor) VisitNullableDataType(inner any) any                                                { return nil }
-func (v *resultsReturningVisitor) VisitCompositeDataType(dataTypes []any) any                                         { return nil }
-func (v *resultsReturningVisitor) VisitArrayDataType(items any) any                                                   { return nil }
-func (v *resultsReturningVisitor) VisitObjectDataType(properties []any, required []string) any                        { return nil }
-func (v *resultsReturningVisitor) VisitAnd(left any, right any) any                                                   { return nil }
-func (v *resultsReturningVisitor) VisitOr(left any, right any) any                                                    { return nil }
-func (v *resultsReturningVisitor) VisitUnless(left any, right any) any                                                { return nil }
-func (v *resultsReturningVisitor) VisitReferenceExpression(name string) any                                           { return nil }
-func (v *resultsReturningVisitor) VisitSubReferenceExpression(name string, sub string) any                            { return nil }
-func (v *resultsReturningVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any { return nil }
-func (v *resultsReturningVisitor) BeginPermission(name string)                                                        {}
-func (v *resultsReturningVisitor) VisitPermission(name string, body any) any                                          { return nil }
+func (v *resultsReturningVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {
+	return nil
+}
+func (v *resultsReturningVisitor) VisitTextDataType(minLength *int, maxLength *int, regex *string) any {
+	return nil
+}
+func (v *resultsReturningVisitor) VisitUUIDDataType() any                        { return nil }
+func (v *resultsReturningVisitor) VisitNumericIDDataType(min *int, max *int) any { return nil }
+func (v *resultsReturningVisitor) VisitBooleanDataType() any                     { return nil }
+func (v *resultsReturningVisitor) VisitDateTimeDataType() any                    { return nil }
+func (v *resultsReturningVisitor) VisitEnumDataType(values []string) any         { return nil }
+func (v *resultsReturningVisitor) VisitNullableDataType(inner any) any           { return nil }
+func (v *resultsReturningVisitor) VisitCompositeDataType(dataTypes []any) any    { return nil }
+func (v *resultsReturningVisitor) VisitArrayDataType(items any) any              { return nil }
+func (v *resultsReturningVisitor) VisitObjectDataType(properties []any, required []string) any {
+	return nil
+}
+func (v *resultsReturningVisitor) VisitAnd(left any, right any) any         { return nil }
+func (v *resultsReturningVisitor) VisitOr(left any, right any) any          { return nil }
+func (v *resultsReturningVisitor) VisitUnless(left any, right any) any      { return nil }
+func (v *resultsReturningVisitor) VisitReferenceExpression(name string) any { return nil }
+func (v *resultsReturningVisitor) VisitSubReferenceExpression(name string, sub string) any {
+	return nil
+}
+func (v *resultsReturningVisitor) VisitRelation(name string, reporter string, typeName string, cardinality string, idType any) any {
+	return nil
+}
+func (v *resultsReturningVisitor) BeginPermission(name string)               {}
+func (v *resultsReturningVisitor) VisitPermission(name string, body any) any { return nil }
 func (v *resultsReturningVisitor) Results() ([]OutputEntry, error) {
 	return v.results, v.resultsErr
 }

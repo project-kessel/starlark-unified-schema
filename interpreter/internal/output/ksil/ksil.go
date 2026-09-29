@@ -300,6 +300,12 @@ func (k *KSILVisitor) VisitRelation(name string, reporter string, typeName strin
 	}
 }
 
+// VisitBooleanWildcardRelation keeps the JSON boolean input form out of KSIL:
+// a wildcard remains the same typed relation in the authorization schema.
+func (k *KSILVisitor) VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error) {
+	return k.VisitRelation(name, reporter, typeName, "All", idType), nil
+}
+
 func (k *KSILVisitor) VisitDataField(name string, required bool, description *string, dataType any) any {
 	return nil
 }

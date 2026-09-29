@@ -26,6 +26,18 @@ type OutputEntry struct {
 	Contents []byte
 }
 
+// BooleanWildcardVisitor is an optional extension for custom visitors that
+// support boolean-backed wildcard relations created by boolean(target). Adding
+// this interface is source-compatible with existing SchemaVisitor
+// implementations, and schemas using wildcard(target) continue to use
+// VisitRelation. Processing a schema containing a boolean-backed wildcard
+// (including the Features schema) with a visitor that does not implement this
+// interface returns an error.
+type BooleanWildcardVisitor interface {
+	// VisitBooleanWildcardRelation processes a wildcard relation with a boolean input.
+	VisitBooleanWildcardRelation(name, reporter, typeName string, idType any) (any, error)
+}
+
 // SchemaVisitor is the interface that custom visitors must implement to
 // process Starlark schema definitions. The interpreter drives the visitor
 // methods in a defined order as it processes schema files.
