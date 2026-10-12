@@ -29,6 +29,7 @@ The Go interpreter loads `.star` files from the `schema/` directory, evaluates r
 ```
 schema/                         # Starlark schema source files (.star)
   kessel.star                   # Core DSL: resource(), field(), relations, permissions
+  API.md                        # DSL reference, generated from docstrings by `make docs`
   <type>/                       # One directory per resource type (host, workspace, …)
     common_representation.star  # Shared fields/relations across reporters
     reporters/<reporter>/       # Reporter-specific resource definitions
@@ -38,6 +39,7 @@ interpreter/                    # Go compiler (Starlark → JSON Schema + KSIL)
   cmd/interpreter/              # CLI entry point
   internal/lang/                # Starlark loader and processor
   internal/output/              # JSON Schema and KSIL visitors
+  internal/docs/                # Generator behind `make docs` (schema/API.md)
   internal/util                 # Additional helper types like the SpyVisitor used in tests
 references/                     # Example schemas for reference (in an obsolete format / for modeling purposes only)
 Makefile                        # build-interpreter, build-schema, test
@@ -100,6 +102,9 @@ make build-interpreter
 
 # Compile all schemas (builds interpreter, then runs it with .env)
 make build-schema
+
+# Regenerate schema/API.md from the DSL docstrings
+make docs
 ```
 
 Alternatively, set environment variables manually and invoke the interpreter directly (doesn't require dotenv):
@@ -174,7 +179,7 @@ host = resource("hbi", common=common,
     })
 ```
 
-Resources can reference other resources (relations) and define permission expressions using the logic operators (`intersect`, `union`, `exclude`) and helpers (`any`, `all`). See existing schemas under `schema/` for patterns.
+Resources can reference other resources (relations) and define permission expressions using the logic operators (`intersect`, `union`, `exclude`) and helpers (`any`, `all`). [schema/API.md](schema/API.md) documents every symbol the DSL exposes — worth keeping open, since Starlark requires each one to be named in a `load()` and the editor extensions offer no autocomplete. See existing schemas under `schema/` for patterns.
 
 ## Contributing: end-to-end workflow
 
@@ -229,6 +234,7 @@ make build-interpreter-debug
 | `make build-schema` | Build interpreter and compile all schemas |
 | `make build-shipped-schema` | Build only consumer-delivered schemas (features allowlist) |
 | `make package-release` | Build shipped schemas and write `jsonschema.tar.gz` + `ksl.tar.gz` |
+| `make docs` | Regenerate `schema/API.md` from the DSL docstrings |
 | `make test` | Run Go unit tests |
 | `make clean` | Remove `bin/`, `output/`, and release tarballs |
 

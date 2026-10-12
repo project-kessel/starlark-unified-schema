@@ -111,15 +111,16 @@ func createDefaultLoaderReaderAndThread() (*Loader, *InmemorySourceFileReader, *
 }
 
 func addSpyCallback(loader *Loader, f func(v string)) {
-	loader.RegisterBuiltin("spy", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		v := ""
-		err := starlark.UnpackPositionalArgs("spy", args, kwargs, 1, &v)
-		if err != nil {
-			return starlark.None, err
-		}
+	loader.RegisterBuiltin("spy", "spy(value)", "Records a value for assertion in tests.",
+		func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			v := ""
+			err := starlark.UnpackPositionalArgs("spy", args, kwargs, 1, &v)
+			if err != nil {
+				return starlark.None, err
+			}
 
-		f(v)
+			f(v)
 
-		return starlark.None, nil
-	})
+			return starlark.None, nil
+		})
 }

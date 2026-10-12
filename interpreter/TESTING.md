@@ -19,6 +19,7 @@ Tests use the standard library `testing` package and `github.com/stretchr/testif
 | `internal/lang` | `Loader_test.go` | Module discovery, `load()` order, caching |
 | `internal/output` | `jsonschema_test.go` | JSONSchemaVisitor unit tests, per data type |
 | `internal/output` | `ksil_test.go` | KSILVisitor unit tests, per relation/permission shape |
+| `internal/docs` | `docs_test.go`, `signature_test.go`, `docstring_test.go` | API reference generation; `TestAPIReferenceIsUpToDate` guards committed `schema/API.md` |
 | `internal/util` | `spy_visitor_test.go` | SpyVisitor capture format |
 | `cmd/interpreter` | `e2e_test.go` | Full pipeline: `.star` fixtures → JSON Schema and KSIL |
 
@@ -28,7 +29,7 @@ For pipeline and visitor design context, see [ARCHITECTURE.md](../ARCHITECTURE.m
 
 End-to-end semantic behavior without writing files to disk:
 
-1. Create an in-memory schema reader: `NewInMemorySourceFileReader("schema")`.
+1. Create an in-memory schema reader: `NewInMemorySourceFileReader("schema", "../../../schema")` — the second argument is where `AddRealSchemaFile` reads from on disk.
 2. Load the real DSL: `setupProcessorWithKessel(t, reader)` — loads `kessel.star` from disk via `AddRealSchemaFile`.
 3. Add inline `.star` fixtures with `util.AddFile(t, reader, ...)`.
 4. Run `processor.Process(...)`.
@@ -37,7 +38,7 @@ End-to-end semantic behavior without writing files to disk:
 Example skeleton:
 
 ```go
-reader := NewInMemorySourceFileReader("schema")
+reader := NewInMemorySourceFileReader("schema", "../../../schema")
 processor := setupProcessorWithKessel(t, reader)
 
 util.AddFile(t, reader, "host/common_representation.star", `...`)
@@ -90,7 +91,7 @@ Note that `internal/output`'s own tests are in `package output` and still carry 
 
 ## Gaps and extension guidance
 
-There are no golden output *files* checked into the repo — expectations live in Go code in the tests above. Schema-level output is still worth eyeballing via `make build-schema` after visitor changes.
+`schema/API.md` is the only generated file checked into the repo, and `TestAPIReferenceIsUpToDate` is the only test that compares against one. Every other expectation lives in Go code in the tests above. Schema-level output is still worth eyeballing via `make build-schema` after visitor changes.
 
 ## When to add tests
 
@@ -101,4 +102,5 @@ There are no golden output *files* checked into the repo — expectations live i
 | How a data type or relation renders in an output format | Extend `internal/output/jsonschema_test.go` or `ksil_test.go` |
 | DSL feature spanning the whole pipeline | Extend `cmd/interpreter/e2e_test.go` |
 | SpyVisitor JSON shape | Update `spy_visitor_test.go` and existing golden expectations |
+| A DSL docstring, a builtin registration, or `internal/docs` | Run `make docs` and commit `schema/API.md`; extend `internal/docs` tests for new extraction or formatting behavior |
 | Starlark-only schema change with no DSL change | `make build-schema` is usually sufficient; add processor tests if the change exercises new semantic paths |

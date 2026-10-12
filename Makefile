@@ -1,4 +1,4 @@
-.PHONY: build-interpreter build-interpreter-debug build-schema build-shipped-schema package-release clean test
+.PHONY: build-interpreter build-interpreter-debug build-schema build-shipped-schema docs package-release clean test
 
 # Features-only delivery allowlist. HBI/RBAC stay in schema/ for full
 # build-schema / build-test coverage, but are not shipped to consumers yet —
@@ -33,6 +33,12 @@ build-shipped-schema: build-interpreter
 	rm -rf "$(JSONSCHEMA_OUTPUT_DIR)" "$(KSL_OUTPUT_DIR)"
 	JSONSCHEMA_OUTPUT_DIR="$(JSONSCHEMA_OUTPUT_DIR)" KSL_OUTPUT_DIR="$(KSL_OUTPUT_DIR)" \
 		./bin/interpreter $(SHIPPED_SCHEMA_FILES)
+
+# Regenerate the DSL API reference from docstrings in schema/*.star.
+# schema/API.md is committed; interpreter/internal/docs fails the test suite
+# when it drifts.
+docs: build-interpreter
+	./bin/interpreter docs -src schema -o schema/API.md
 
 # Package release tarballs in the repo root (gitignored).
 package-release: build-shipped-schema

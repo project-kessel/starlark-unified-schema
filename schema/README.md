@@ -2,7 +2,7 @@
 
 Starlark schema files go here.
 
-The DSL is [kessel.star](kessel.star). For how it works and what it emits, see [ARCHITECTURE.md](../ARCHITECTURE.md#starlark-dsl).
+[API.md](API.md) is the reference for the DSL: every symbol, its signature, and what it does. It is generated from the docstrings in [kessel.star](kessel.star) by `make docs` and committed, so read it there rather than scrolling the source. For how the DSL works and what it emits, see [ARCHITECTURE.md](../ARCHITECTURE.md#starlark-dsl).
 
 To invoke a KSL extension hand-authored downstream, use the `call_ksl_extension` builtin — no `load()` required. Wrap it in a function named for the extension rather than calling it directly from schema files; see [Backward-compatibility with KSL extensions](../ARCHITECTURE.md#backward-compatibility-with-ksl-extensions).
 
