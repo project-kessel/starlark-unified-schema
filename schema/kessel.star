@@ -1,4 +1,4 @@
-"""The Kessel schema DSL standard library."""
+_module_doc = """The Kessel schema DSL standard library."""
 
 def _make_logic_operators(self_ref_holder):
     """Constructs operator methods that can be mixed into any struct."""
@@ -191,11 +191,11 @@ def resource(reporter, id_type=None, extends=None, final=False, common={}, field
         ),
         "enabled_services": lambda w: w._paid_services.intersect(w._desired_services),
     })
+    ```
 
     Returns:
 
     A resource type object
-    ```
     """
     if id_type == None and extends==None:
         fail("resource: either an id_type or a type to extend must be specified")

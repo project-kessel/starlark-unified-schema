@@ -1,4 +1,4 @@
-"""Wrappers for KSL extensions in the `hbi` namespace: https://github.com/project-kessel/rbac-config/blob/master/configs/prod/schemas/src/hbi.ksl"""
+_module_doc = """Wrappers for KSL extensions in the `hbi` namespace: https://github.com/project-kessel/rbac-config/blob/master/configs/prod/schemas/src/hbi.ksl"""
 
 def _make_host_permission_reference(relation):
     def accessor(host):

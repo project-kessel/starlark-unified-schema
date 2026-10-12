@@ -88,6 +88,8 @@ Creates an immutable struct from the given keyword arguments. Fields are read ba
 
 ## `extensions/hbi.star`
 
+Wrappers for KSL extensions in the `hbi` namespace: https://github.com/project-kessel/rbac-config/blob/master/configs/prod/schemas/src/hbi.ksl
+
 <a id="extensions-hbi-star-expose-host-permission"></a>
 
 ### `expose_host_permission`
@@ -111,6 +113,8 @@ Exposes an RBAC workspace permission transitively through the host.
 <a id="module-extensions-rbac-star"></a>
 
 ## `extensions/rbac.star`
+
+Wrappers for KSL extensions in the `rbac` namespace: https://github.com/project-kessel/rbac-config/blob/master/configs/prod/schemas/src/rbac.ksl
 
 <a id="extensions-rbac-star-add-v1-based-permission"></a>
 
@@ -199,6 +203,8 @@ The v1 and v2 permission names take the form `{app}_{resource}_{verb}`, and this
 
 ## `kessel.star`
 
+The Kessel schema DSL standard library.
+
 <a id="kessel-star-resource"></a>
 
 ### `resource`
@@ -255,11 +261,11 @@ workspace = resource("features", extends=rbac_workspace, fields={
     ),
     "enabled_services": lambda w: w._paid_services.intersect(w._desired_services),
 })
+```
 
-Returns:
+**Returns:**
 
 A resource type object
-```
 
 <a id="kessel-star-text"></a>
 

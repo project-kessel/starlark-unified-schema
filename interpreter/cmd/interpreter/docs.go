@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/docs"
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
@@ -43,7 +44,11 @@ func runDocs(args []string) error {
 		return err
 	}
 
-	if err := os.WriteFile(*outPath, []byte(docs.Markdown(reference)), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(*outPath), 0o755); err != nil { //rwxr-xr-x
+		return fmt.Errorf("creating output directory for %s: %w", *outPath, err)
+	}
+
+	if err := os.WriteFile(*outPath, []byte(docs.Markdown(reference)), 0o644); err != nil { //rw-r--r--
 		return fmt.Errorf("writing %s: %w", *outPath, err)
 	}
 

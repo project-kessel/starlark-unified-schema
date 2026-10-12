@@ -1,4 +1,4 @@
-"""Wrappers for KSL extensions in the `rbac` namespace: https://github.com/project-kessel/rbac-config/blob/master/configs/prod/schemas/src/rbac.ksl"""
+_module_doc = """Wrappers for KSL extensions in the `rbac` namespace: https://github.com/project-kessel/rbac-config/blob/master/configs/prod/schemas/src/rbac.ksl"""
 
 def _make_workspace_permission_reference(relation):
     def accessor(workspace):
