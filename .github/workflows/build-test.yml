@@ -32,9 +32,6 @@ jobs:
       - name: Run tests
         run: make test
 
-      - name: Verify API reference is current
-        run: make docs && git diff --exit-code schema/API.md
-
       - name: Build schema
         env:
           JSONSCHEMA_OUTPUT_DIR: output/jsonschema

@@ -372,7 +372,7 @@ Permits null in addition to whatever `inner` allows.
 union(left, right)
 ```
 
-A choice between two data types; a value matching either is valid.
+A choice between two data types; a value must match exactly one.
 
 Nest calls for more than two alternatives. Note this is specifically for data types.
 See `resource` for details on boolean logic in permissions.
@@ -381,6 +381,10 @@ See `resource` for details on boolean logic in permissions.
 
 - `left`: the first permitted data type.
 - `right`: the second permitted data type.
+
+**Note:**
+
+If a value matches multiple data types, it's invalid.
 
 <a id="kessel-star-array"></a>
 
