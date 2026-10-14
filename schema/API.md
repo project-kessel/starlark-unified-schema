@@ -362,7 +362,7 @@ Permits null in addition to whatever `inner` allows.
 
 **Args:**
 
-- `inner`: the data type to widen. Nesting a `union()` is flattened, so `nullable(union(uuid(), text()))` offers three alternatives rather than a null alongside a nested choice.
+- `inner`: the data type to make nullable. Nesting a `union()` is flattened, so `nullable(union(uuid(), text(regex="^\d{10}$")))` allows: * A null value * A 10-digit numeric string * a UUID
 
 <a id="kessel-star-union"></a>
 
