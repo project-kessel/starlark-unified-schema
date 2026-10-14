@@ -236,6 +236,9 @@ make docs
 
 # Run tests
 make test
+
+# Validate the interpreter, compile all schemas, and refresh docs:
+make all
 ```
 
 Alternatively, set environment variables manually:

@@ -1,7 +1,6 @@
 package docs
 
 import (
-	"os"
 	"testing"
 
 	"github.com/project-kessel/starlark-unified-schema/internal/lang"
@@ -198,16 +197,4 @@ func TestGenerateDocumentsBuiltins(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{"call_ksl_extension", "println", "struct"}, names)
-}
-
-// The drift guard for the committed reference.
-func TestAPIReferenceIsUpToDate(t *testing.T) {
-	committed, err := os.ReadFile(apiReferencePath)
-	require.NoError(t, err)
-
-	ref, err := Generate(lang.NewLoader(schemaDir))
-	require.NoError(t, err)
-
-	assert.Equal(t, string(committed), Markdown(ref),
-		"schema/API.md is out of date with the docstrings in schema/*.star — run `make docs`")
 }

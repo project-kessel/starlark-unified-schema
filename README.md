@@ -105,6 +105,9 @@ make build-schema
 
 # Regenerate schema/API.md from the DSL docstrings
 make docs
+
+# Validate the interpreter, compile all schemas, and refresh docs:
+make all
 ```
 
 Alternatively, set environment variables manually and invoke the interpreter directly (doesn't require dotenv):

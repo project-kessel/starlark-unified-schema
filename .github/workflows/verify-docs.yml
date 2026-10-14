@@ -1,0 +1,33 @@
+name: CI Verify Docs
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel in-progress runs on PR update
+  group: ci-${{ github.head_ref || github.run_id }}-docs
+  cancel-in-progress: true
+
+jobs:
+  verify-docs:
+    name: Verify API Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: interpreter/go.mod
+          cache-dependency-path: interpreter/go.sum
+
+      - name: Check for API Doc Drift
+        run: make docs && git diff --exit-code schema/API.md

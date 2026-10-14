@@ -16,6 +16,8 @@ KSL_RELEASE_FILES ?= features.json
 JSONSCHEMA_OUTPUT_DIR ?= output/jsonschema
 KSL_OUTPUT_DIR ?= output/ksl
 
+all: test build-schema docs
+
 build-interpreter:
 	go build -C ./interpreter/ -o ../bin/interpreter ./cmd/interpreter
 
@@ -27,6 +29,7 @@ test:
 
 build-schema: build-interpreter
 	dotenv -f .env run ./bin/interpreter
+
 
 # Build only the artifacts that are delivered to consumers.
 build-shipped-schema: build-interpreter
