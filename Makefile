@@ -1,4 +1,4 @@
-.PHONY: build-interpreter build-interpreter-debug build-schema build-shipped-schema package-release clean test
+.PHONY: build-interpreter build-interpreter-debug build-schema build-shipped-schema docs package-release clean test
 
 # Features-only delivery allowlist. HBI/RBAC stay in schema/ for full
 # build-schema / build-test coverage, but are not shipped to consumers yet —
@@ -16,23 +16,31 @@ KSL_RELEASE_FILES ?= features.json
 JSONSCHEMA_OUTPUT_DIR ?= output/jsonschema
 KSL_OUTPUT_DIR ?= output/ksl
 
+.PHONY all: test build-schema docs
+
 build-interpreter:
 	go build -C ./interpreter/ -o ../bin/interpreter ./cmd/interpreter
 
 build-interpreter-debug:
 	go build -C ./interpreter/ -o ../bin/interpreter -gcflags="all=-N -l" ./cmd/interpreter
 
-test:
+.PHONY test:
 	go test -C ./interpreter/ -count=1 ./...
 
 build-schema: build-interpreter
 	dotenv -f .env run ./bin/interpreter
+
 
 # Build only the artifacts that are delivered to consumers.
 build-shipped-schema: build-interpreter
 	rm -rf "$(JSONSCHEMA_OUTPUT_DIR)" "$(KSL_OUTPUT_DIR)"
 	JSONSCHEMA_OUTPUT_DIR="$(JSONSCHEMA_OUTPUT_DIR)" KSL_OUTPUT_DIR="$(KSL_OUTPUT_DIR)" \
 		./bin/interpreter $(SHIPPED_SCHEMA_FILES)
+
+# Regenerate the DSL API reference from docstrings in schema/*.star.
+# schema/API.md is committed
+docs: build-interpreter
+	./bin/interpreter docs -src schema -o schema/API.md
 
 # Package release tarballs in the repo root (gitignored).
 package-release: build-shipped-schema

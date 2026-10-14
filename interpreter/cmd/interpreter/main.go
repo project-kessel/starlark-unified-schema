@@ -12,12 +12,29 @@ import (
 )
 
 func main() {
+	// Dispatch happens before any flag parsing so that bare invocation and
+	// `interpreter [-src dir] [file ...]` keep their existing meaning.
+	if isDocsInvocation(os.Args) {
+		if err := runDocs(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "docs: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	runCompile()
+}
+
+func runCompile() {
 	srcDir := flag.String("src", "schema", "path to the directory containing Starlark schema (.star) files")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options] [file ...]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] [file ...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s %s [options]\n\n", os.Args[0], docsSubcommand)
 		fmt.Fprintf(os.Stderr, "Processes Starlark schema files and generates JSON Schema artifacts.\n")
 		fmt.Fprintf(os.Stderr, "If no files are specified, all .star files under -src are processed.\n\n")
+		fmt.Fprintf(os.Stderr, "Commands:\n")
+		fmt.Fprintf(os.Stderr, "  %s\tGenerate a Markdown API reference from the DSL docstrings.\n\n", docsSubcommand)
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 	}

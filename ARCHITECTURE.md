@@ -175,6 +175,7 @@ Calls are recorded while a module executes and drained when that module is proce
 starlark-unified-schema/
 ├── schema/                              # Starlark schema source (committed)
 │   ├── kessel.star                      # Core DSL: resource(), field(), types, relations, permissions
+│   ├── API.md                           # DSL reference, generated from docstrings by `make docs`
 │   ├── <type>/                          # One directory per logical resource type
 │   │   ├── common_representation.star   # Shared fields/relations across reporters
 │   │   └── reporters/<reporter>/        # Reporter-specific resource definitions
@@ -182,7 +183,8 @@ starlark-unified-schema/
 │
 ├── interpreter/                         # Go compiler
 │   ├── cmd/interpreter/
-│   │   └── main.go                      # CLI entry point, visitor wiring, output config
+│   │   ├── main.go                      # CLI entry point, visitor wiring, output config
+│   │   └── docs.go                      # `interpreter docs` subcommand
 │   │
 │   ├── internal/
 │   │   ├── lang/                        # Starlark loading and semantic processing
@@ -196,6 +198,12 @@ starlark-unified-schema/
 │   │   │   ├── jsonschema.go            # Draft-07 JSON Schema visitor
 │   │   │   ├── ksil.go                  # KSIL namespace visitor
 │   │   │   └── writer.go                # Filesystem output with path safety checks
+│   │   │
+│   │   ├── docs/                        # API reference generator (schema/API.md)
+│   │   │   ├── docs.go                  # Module walk, symbol collection
+│   │   │   ├── signature.go             # Call-syntax reconstruction from *starlark.Function
+│   │   │   ├── docstring.go             # Docstring dedent and Google-section formatting
+│   │   │   └── markdown.go              # Markdown rendering
 │   │   │
 │   │   └── util/
 │   │       └── spy_visitor.go           # Test visitor with golden JSON assertions
@@ -223,8 +231,14 @@ make build-interpreter
 # Compile all schemas (uses .env for output directories)
 make build-schema
 
+# Regenerate schema/API.md from the DSL docstrings
+make docs
+
 # Run tests
 make test
+
+# Validate the interpreter, compile all schemas, and refresh docs:
+make all
 ```
 
 Alternatively, set environment variables manually:
@@ -242,6 +256,14 @@ Compile specific files only:
 ```
 
 At least one of `JSONSCHEMA_OUTPUT_DIR` or `KSL_OUTPUT_DIR` must be set; the interpreter exits with an error if neither is configured.
+
+The `docs` subcommand is the one exception: it reads the same schema tree but writes a Markdown reference instead of artifacts, so it needs no output directories.
+
+```bash
+./bin/interpreter docs -src schema -o schema/API.md
+```
+
+See [Generating the API reference](#generating-the-api-reference).
 
 ## Core Concepts
 
@@ -284,6 +306,8 @@ starlark-unified-schema uses a layered pipeline from Starlark source to disk art
 
 The DSL lives in `schema/kessel.star` and is plain Starlark — the only custom interpreter builtins are `struct`, `println`, and `call_ksl_extension`; everything else is standard `load()`.
 
+[schema/API.md](schema/API.md) is the complete reference, generated from the docstrings. The table below is an orientation map, not a substitute for it.
+
 | Construct | Role |
 |-----------|------|
 | `resource(reporter, id_type, common={}, fields={}, permissions={})` | Defines a resource; returns a tagged struct consumed by the processor |
@@ -292,7 +316,7 @@ The DSL lives in `schema/kessel.star` and is plain Starlark — the only custom 
 | `at_most_one`, `one`, `at_least_one`, `many`, `wildcard` | Relation cardinality helpers; `wildcard(target)` keeps the qualified marker input, while `boolean(target)` creates an optional JSON boolean wildcard |
 | `self()` | Relation target referring to the enclosing resource |
 | `permissions={ "name": lambda proxy: ... }` | Permission factories evaluated at schema load time |
-| `.union(...)`, `.intersect(...)`, `.except(...)` | Set operations available on relations and permissions when defining a permission. Ex: `lambda w: w.direct_value.union(w.parent.value)` |
+| `.union(...)`, `.intersect(...)`, `.exclude(...)` | Set operations available on relations and permissions when defining a permission. Ex: `lambda w: w.direct_value.union(w.parent.value)` |
 | `any(...)`, `all(...)` | Logic helpers, equivalent to chaining `.union(...)` or `.intersect(...)` respectively. Ex: `lambda w: any(w.direct_value, w.parent.value)` |
 
 A minimal resource:
@@ -439,6 +463,8 @@ func NewLoader(path string) *Loader
 func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict, error)
 func (l *Loader) GetAllModuleNames() ([]string, error)
 func (l *Loader) SetMetadata(metadata map[resourceType]meta)
+func (l *Loader) RegisterBuiltin(name, signature, doc string, callback BuiltinCallback)
+func (l *Loader) BuiltinDocs() []BuiltinDoc
 ```
 
 **Key Features**:
@@ -447,8 +473,11 @@ func (l *Loader) SetMetadata(metadata map[resourceType]meta)
 - Recursive discovery of `*.star` files under the schema root
 - `Thread.Load` callback resolves `load()` imports
 - Records `reporter`, type name, and `id_type` for each resource on load
+- `LoadBindsGlobally` stays off, so `load()`ed names bind file-locally rather than becoming globals of the importing module — the API reference generator depends on this to tell what a module defines from what it imports
 
 **Builtins** (`Builtins.go`): `struct` (from starlarkstruct), `println` (debug), `call_ksl_extension` (see [Backward-compatibility with KSL extensions](#backward-compatibility-with-ksl-extensions))
+
+`RegisterBuiltin` takes a signature and doc string alongside the callback, and both are mandatory. A `*starlark.Builtin` exposes only its name at runtime — there is no parameter metadata and no `Doc()` — so neither can be recovered by introspection the way a Starlark `def` can. They feed `schema/API.md`.
 
 ### lang.Processor
 
@@ -474,6 +503,27 @@ Member dispatch uses the `kind` attribute on each field struct:
 ```go
 func WriteSchemas(outputDir string, entries []OutputEntry) error
 ```
+
+### Generating the API Reference
+
+**Purpose**: Renders `schema/API.md` from the docstrings in the DSL, so the reference cannot drift from the code it describes.
+
+```go
+func Generate(loader *lang.Loader) (*Reference, error)
+func Markdown(ref *Reference) string
+```
+
+Extraction is pure runtime introspection — no parsing of source or comments. `internal/docs` executes every module through the same `lang.Loader` the compiler uses, then reads `Doc()`, `Position()`, and the parameter metadata off each `*starlark.Function` global. It deliberately does **not** build a `Processor`: leaving `Loader.metadata` nil makes `recordMetadata` a no-op, which drops the load-order constraint that cross-resource relations otherwise impose.
+
+A module is documented only if it has at least one public `*starlark.Function` global, which excludes the schema-definition files automatically — they export structs and dicts. Within a module:
+
+- `_`-prefixed names are skipped. Starlark's `load()` cannot import them, so underscore is the real public/private boundary.
+- A function whose `Position().Filename()` is some other file is skipped. Schema files bind the accessor closures that `extensions/*.star` wrappers return; those belong to the defining module.
+- Symbols are ordered by source line, so related constructors stay grouped.
+
+Module-level docstrings are not reachable at runtime — `*starlark.Program` exposes no accessor for the toplevel's `Doc` — so a module blurb is written as a `_module_doc = """..."""` global instead. Underscore globals are excluded from `load()` but are present in the returned `StringDict`.
+
+Output is deterministic: modules, global names, and builtins are each sorted, the per-module stable sort by line breaks ties by name, and the banner carries no timestamp or version. `TestAPIReferenceIsUpToDate` compares a fresh render against the committed file, and CI repeats the check with `git diff --exit-code`.
 
 ## Data Flow
 
@@ -590,6 +640,8 @@ The processor looks up target resources by struct identity when visiting relatio
 ### Dual-Pass CLI
 
 Output formats are configured independently via environment variables. The CLI creates one visitor per configured directory and runs `Processor.Process` separately for each. This keeps visitors stateless and avoids mixing JSON Schema and KSIL aggregation in one pass.
+
+The `docs` subcommand is dispatched on `os.Args[1]` before any flag parsing and uses its own `FlagSet`, so bare `./bin/interpreter` and `./bin/interpreter [-src dir] [file ...]` keep their existing meaning and docs flags never reach the compile path.
 
 ### Dependency Injection
 

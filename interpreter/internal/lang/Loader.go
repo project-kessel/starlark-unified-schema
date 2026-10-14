@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"go.starlark.net/starlark"
@@ -17,6 +18,7 @@ type Loader struct {
 	modules      map[string]starlark.StringDict
 	opts         *syntax.FileOptions
 	predeclared  starlark.StringDict
+	builtinDocs  map[string]BuiltinDoc
 	reader       sourceFileReader
 	module_names []string
 	metadata     map[resourceType]meta
@@ -36,10 +38,16 @@ func NewLoader(path string) *Loader {
 
 func NewLoaderForReader(path string, reader sourceFileReader) *Loader {
 	l := &Loader{
-		path:           path,
-		modules:        map[string]starlark.StringDict{},
+		path:    path,
+		modules: map[string]starlark.StringDict{},
+		// Defaults matter here: LoadBindsGlobally must stay false so load()ed
+		// names bind file-locally rather than becoming globals of the importing
+		// module. The docs generator reads a module's globals to find the symbols
+		// it defines, and would otherwise re-document the whole DSL under every
+		// schema file that loads it.
 		opts:           &syntax.FileOptions{},
 		predeclared:    starlark.StringDict{},
+		builtinDocs:    map[string]BuiltinDoc{},
 		module_names:   nil,
 		reader:         reader,
 		metadata:       nil,
@@ -166,9 +174,44 @@ func (l *Loader) GetAllModuleNames() ([]string, error) {
 	return names, nil
 }
 
-func (l *Loader) RegisterBuiltin(name string, callback func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) {
-	v := starlark.NewBuiltin(name, callback)
-	l.predeclared[name] = v
+// BuiltinCallback is the Go implementation of a predeclared builtin. It is an
+// alias rather than a defined type so callers can keep passing bare func
+// literals.
+type BuiltinCallback = func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)
+
+// BuiltinDoc describes a predeclared builtin for the generated API reference.
+type BuiltinDoc struct {
+	Name      string
+	Signature string // Starlark call syntax, e.g. `struct(**fields)`
+	Doc       string
+}
+
+// RegisterBuiltin adds a predeclared global, available to every module without
+// a load().
+//
+// Signature and doc are required: unlike a Starlark def, a *starlark.Builtin
+// exposes only its name at runtime, so neither can be recovered by
+// introspection. Both feed schema/API.md, which is the only reference schema
+// authors have for these names.
+func (l *Loader) RegisterBuiltin(name, signature, doc string, callback BuiltinCallback) {
+	l.predeclared[name] = starlark.NewBuiltin(name, callback)
+	l.builtinDocs[name] = BuiltinDoc{Name: name, Signature: signature, Doc: doc}
+}
+
+// BuiltinDocs returns every registered builtin, sorted by name.
+func (l *Loader) BuiltinDocs() []BuiltinDoc {
+	names := make([]string, 0, len(l.builtinDocs))
+	for name := range l.builtinDocs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	docs := make([]BuiltinDoc, 0, len(names))
+	for _, name := range names {
+		docs = append(docs, l.builtinDocs[name])
+	}
+
+	return docs
 }
 
 type sourceFileReader interface {

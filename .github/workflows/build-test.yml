@@ -1,4 +1,4 @@
-name: CI Build and Test
+name: CI
 
 on:
   push:
@@ -15,6 +15,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-docs:
+    name: Verify API Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: interpreter/go.mod
+          cache-dependency-path: interpreter/go.sum
+
+      - name: Check for API Doc Drift
+        run: make docs && git diff --exit-code schema/API.md
+  
   build-and-test:
     name: Build & run tests
     runs-on: ubuntu-latest
