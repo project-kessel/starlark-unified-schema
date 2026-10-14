@@ -38,8 +38,7 @@ build-shipped-schema: build-interpreter
 		./bin/interpreter $(SHIPPED_SCHEMA_FILES)
 
 # Regenerate the DSL API reference from docstrings in schema/*.star.
-# schema/API.md is committed; interpreter/internal/docs fails the test suite
-# when it drifts.
+# schema/API.md is committed
 docs: build-interpreter
 	./bin/interpreter docs -src schema -o schema/API.md
 
