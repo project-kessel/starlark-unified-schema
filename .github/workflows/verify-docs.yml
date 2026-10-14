@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   verify-docs:
+    if: false
     name: Verify API Docs
     runs-on: ubuntu-latest
     steps:

@@ -16,7 +16,7 @@ KSL_RELEASE_FILES ?= features.json
 JSONSCHEMA_OUTPUT_DIR ?= output/jsonschema
 KSL_OUTPUT_DIR ?= output/ksl
 
-all: test build-schema docs
+.PHONY all: test build-schema docs
 
 build-interpreter:
 	go build -C ./interpreter/ -o ../bin/interpreter ./cmd/interpreter
@@ -24,7 +24,7 @@ build-interpreter:
 build-interpreter-debug:
 	go build -C ./interpreter/ -o ../bin/interpreter -gcflags="all=-N -l" ./cmd/interpreter
 
-test:
+.PHONY test:
 	go test -C ./interpreter/ -count=1 ./...
 
 build-schema: build-interpreter
