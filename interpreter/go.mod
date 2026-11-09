@@ -1,6 +1,6 @@
 module github.com/project-kessel/starlark-unified-schema
 
-go 1.25.0
+go 1.26.10
 
 require (
 	github.com/project-kessel/ksl-schema-language v0.1.2
