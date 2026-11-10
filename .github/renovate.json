@@ -12,13 +12,6 @@
         "branchTopic": "dependency-updates",
         "commitMessageTopic": "dependencies"
       }
-    },
-    {
-      "description": "Disable Go major updates on indirect dependencies since these change module paths",
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["indirect"],
-      "matchUpdateTypes": ["major"],
-      "enabled": false
     }
   ]
 }
