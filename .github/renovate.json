@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "gomod": {
+    "schedule": ["* 0-7 * * 0"],
+    "packageRules": [
+      {
+        "description": "Group Go dependency updates into one weekly PR",
+        "matchManagers": ["gomod"],
+        "groupName": "Go dependencies",
+        "group": {
+          "branchTopic": "go-updates",
+          "commitMessageTopic": "Go dependencies"
+        }
+      },
+      {
+        "description": "Do not propose Go major bumps on indirect dependencies; these change module paths",
+        "matchManagers": ["gomod"],
+        "matchDepTypes": ["indirect"],
+        "matchUpdateTypes": ["major"],
+        "enabled": false
+      }
+    ]
+  },
+  "github-actions": {
+    "schedule": ["* 0-7 * * 0"],
+    "packageRules": [
+      {
+        "description": "Group GitHub Actions updates into one weekly PR",
+        "matchManagers": ["github-actions"],
+        "groupName": "GitHub Actions",
+        "group": {
+          "branchTopic": "github-actions",
+          "commitMessageTopic": "GitHub Actions"
+        }
+      }
+    ]
+  }
+}
