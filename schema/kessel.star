@@ -132,7 +132,7 @@ def _process_permissions(common, parent, object, permissions):
 
     return combined_fields
 
-def resource(reporter, id_type=None, extends=None, final=False, common={}, fields={}, permissions={}):
+def resource(reporter=None, id_type=None, extends=None, final=False, common={}, fields={}, permissions={}):
     """Declares a resource type.
 
     Each resource reported to Kessel must be of a type. A type has fields and permissions.
@@ -143,6 +143,7 @@ def resource(reporter, id_type=None, extends=None, final=False, common={}, field
 
     Args:
       reporter: name of the reporter that reports this resource, e.g. `"hbi"`.
+        Defaults to the file's `reporter(name)` declaration. An explicit value overrides it.
       id_type: data type of the resource's identifier. Must be a value data type (not another resource type.)
         Required unless `extends` is given, in which case the parent's id type is
         inherited and passing one here is an error.
@@ -181,7 +182,8 @@ def resource(reporter, id_type=None, extends=None, final=False, common={}, field
     respectively.
 
     ```python
-    workspace = resource("features", extends=rbac_workspace, fields={
+    reporter("features")
+    workspace = resource(extends=rbac_workspace, fields={
         "direct_billing_account": at_most_one(billing_account),
         "ignore_inherited_paid_services": boolean(service),
     }, permissions={
@@ -197,6 +199,7 @@ def resource(reporter, id_type=None, extends=None, final=False, common={}, field
 
     A resource type object
     """
+    reporter = resolve_reporter(reporter)
     if id_type == None and extends==None:
         fail("resource: either an id_type or a type to extend must be specified")
 

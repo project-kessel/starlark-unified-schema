@@ -30,6 +30,7 @@ type Loader struct {
 	// processed in its own right.
 	currentModule  string
 	extensionCalls map[string][]extensionReferenceCall
+	reporters      map[string]string
 }
 
 func NewLoader(path string) *Loader {
@@ -52,6 +53,7 @@ func NewLoaderForReader(path string, reader sourceFileReader) *Loader {
 		reader:         reader,
 		metadata:       nil,
 		extensionCalls: map[string][]extensionReferenceCall{},
+		reporters:      map[string]string{},
 	}
 
 	registerDefaultBuiltins(l)
@@ -78,6 +80,8 @@ func (l *Loader) Load(thread *starlark.Thread, name string) (starlark.StringDict
 	// saving and restoring the previous value is a sufficient stack.
 	previousModule := l.currentModule
 	l.currentModule = name
+	// A failed load may be retried; do not keep its reporter declaration.
+	delete(l.reporters, name)
 	globals, err := starlark.ExecFileOptions(l.opts, thread, name, contents, l.predeclared)
 	l.currentModule = previousModule
 	if err != nil {

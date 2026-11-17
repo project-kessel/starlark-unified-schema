@@ -3,7 +3,9 @@ load("billing_account/reporters/features/billing_account.star", "billing_account
 load("service/reporters/features/service.star", "service")
 load("workspace/reporters/rbac/workspace.star", rbac_workspace="workspace")
 
-workspace = resource("features", extends=rbac_workspace, fields={
+reporter("features")
+
+workspace = resource(extends=rbac_workspace, fields={
     "direct_billing_account": at_most_one(billing_account),
     "direct_service_preferences": many(service),
     "desire_all_services": boolean(service),
