@@ -117,16 +117,13 @@ Wrappers for KSL extensions in the `hbi` namespace: https://github.com/project-k
 ### `expose_host_permission`
 
 ```python
-expose_host_permission(v2_perm, host_perm, *legacy_reporter, reporter=None)
+expose_host_permission(v2_perm, host_perm, *, reporter=None)
 ```
 
 Exposes an RBAC workspace permission transitively through the host.
 
-The former reporter-first positional form is also accepted.
-
 **Args:**
 
-- `legacy_reporter`: compatibility argument for the former reporter-first positional form.
 - `reporter`: optional override for the file's `reporter(name)` default.
 - `v2_perm`: the RBAC permission being exposed.
 - `host_perm`: the name it is exposed as on the host type, used with access requests against hosts
@@ -146,16 +143,13 @@ Wrappers for KSL extensions in the `rbac` namespace: https://github.com/project-
 ### `add_v1_based_permission`
 
 ```python
-add_v1_based_permission(app, resource, verb, v2_perm, *legacy_reporter, reporter=None)
+add_v1_based_permission(app, resource, verb, v2_perm, *, reporter=None)
 ```
 
 Declares a v2 permission derived from an existing RBAC v1 permission.
 
-The former reporter-first positional form is also accepted.
-
 **Args:**
 
-- `legacy_reporter`: compatibility argument for the former reporter-first positional form.
 - `reporter`: optional override for the file's `reporter(name)` default.
 - `app`: RBAC v1 application name, taken from the permissions json filename without the .json extension e.g. `"inventory"`.
 - `resource`: RBAC v1 resource type, ex: `"hosts"`.
@@ -171,18 +165,15 @@ The former reporter-first positional form is also accepted.
 ### `add_v1only_permission`
 
 ```python
-add_v1only_permission(perm, *legacy_reporter, reporter=None)
+add_v1only_permission(perm, *, reporter=None)
 ```
 
 Declares a permission that exists in RBAC v1, used to create placeholders for permissions for unmigrated services.
 
 Returns nothing
 
-The former reporter-first positional form is also accepted.
-
 **Args:**
 
-- `legacy_reporter`: compatibility argument for the former reporter-first positional form.
 - `reporter`: optional override for the file's `reporter(name)` default.
 - `perm`: the v1 permission name, constructed from the RBAC application, resource, and verb: {application}_{resource}_{verb}
 
@@ -191,16 +182,13 @@ The former reporter-first positional form is also accepted.
 ### `add_contingent_permission`
 
 ```python
-add_contingent_permission(first, second, contingent, *legacy_reporter, reporter=None)
+add_contingent_permission(first, second, contingent, *, reporter=None)
 ```
 
 Declares a workspace permission that depends on two other workspace permissions, commonly used when a permission may be granted anywhere but only applies where it overlaps with another
 
-The former reporter-first positional form is also accepted.
-
 **Args:**
 
-- `legacy_reporter`: compatibility argument for the former reporter-first positional form.
 - `reporter`: optional override for the file's `reporter(name)` default.
 - `first`: v2 name of the first prerequisite permission
 - `second`: v2 name of the second prerequisite permission.
@@ -215,18 +203,15 @@ The former reporter-first positional form is also accepted.
 ### `add_unified_permission`
 
 ```python
-add_unified_permission(app, resource, verb, *legacy_reporter, reporter=None)
+add_unified_permission(app, resource, verb, *, reporter=None)
 ```
 
 Declares a permission whose v1 and v2 names are the same.
 
 The v1 and v2 permission names take the form `{app}_{resource}_{verb}`, and this value is used with access requests against workspaces
 
-The former reporter-first positional form is also accepted.
-
 **Args:**
 
-- `legacy_reporter`: compatibility argument for the former reporter-first positional form.
 - `reporter`: optional override for the file's `reporter(name)` default.
 - `app`: RBAC application name.
 - `resource`: RBAC resource type.

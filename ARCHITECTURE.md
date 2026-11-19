@@ -161,7 +161,7 @@ call_ksl_extension("advisor", "add_v1_based_permission", "rbac", app=inventory, 
 
 The first argument is the reporter whose namespace the reference is written to, the second names the extension, the third the namespace the extension is *defined* in, and every keyword argument becomes an extension parameter. All three positional arguments are required, and parameter values must be strings.
 
-It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly; those wrappers resolve their optional `reporter=` keyword against the calling file's default, then pass the resolved string through. Fully positional calls using the former reporter-first signature remain supported.
+It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly; those wrappers resolve their optional `reporter=` keyword against the calling file's default, then pass the resolved string through.
 
 References are grouped into the namespace named by `reporter`, alongside any types that reporter defines, and a reporter that only makes extension calls gets a namespace holding nothing but `extension_references`. Placement does not affect what an extension generates — `Extension.Apply` resolves each of its dynamic types against the extension's own namespace, never the calling one. Within a namespace, identical `(namespace, name, params)` calls are deduplicated, because applying an extension twice re-adds its relations to the type it extends; the same call under two different reporters is emitted in both.
 

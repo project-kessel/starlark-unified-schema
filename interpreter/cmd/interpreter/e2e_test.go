@@ -410,22 +410,13 @@ func verifyOutputs(t *testing.T, processor *lang.Processor, ksilModules map[stri
 // Compare both artifact families through the real loader, DSL, processor, and
 // visitors. In particular, wrapper functions belong to imported modules but
 // must use the reporter of the schema that invokes them.
-func TestReporterDefaultOutputCompatibility(t *testing.T) {
+func TestReporterDefaultOutputEquivalence(t *testing.T) {
 	const imports = `
 load("kessel.star", "resource", "uuid")
 load("extensions/rbac.star", "add_v1_based_permission", "add_v1only_permission", "add_contingent_permission", "add_unified_permission")
 load("extensions/hbi.star", "expose_host_permission")
 `
 	cases := []struct{ name, source string }{
-		{"legacy positional", `
-item = resource("test", id_type=uuid())
-add_v1_based_permission("test", "app", "items", "read", "view")
-add_v1only_permission("test", "app_items_write")
-add_contingent_permission("test", "view", "edit", "both")
-add_unified_permission("test", "app", "items", "read")
-expose_host_permission("test", "view", "host_view")
-add_v1only_permission("other", "other_items_read")
-`},
 		{"default", `
 reporter("test")
 item = resource(id_type=uuid())

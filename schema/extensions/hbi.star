@@ -7,13 +7,10 @@ def _make_host_permission_reference(relation):
         return host.sub(relation)
     return accessor
 
-def expose_host_permission(v2_perm, host_perm, *legacy_reporter, reporter=None):
+def expose_host_permission(v2_perm, host_perm, *, reporter=None):
     """Exposes an RBAC workspace permission transitively through the host.
 
-    The former reporter-first positional form is also accepted.
-
     Args:
-      legacy_reporter: compatibility argument for the former reporter-first positional form.
       reporter: optional override for the file's `reporter(name)` default.
       v2_perm: the RBAC permission being exposed.
       host_perm: the name it is exposed as on the host type, used with access requests against hosts
@@ -21,10 +18,6 @@ def expose_host_permission(v2_perm, host_perm, *legacy_reporter, reporter=None):
     Returns:
       A function that accesses the workspace permission via a host relation.
     """
-    if legacy_reporter:
-        if len(legacy_reporter) != 1 or reporter != None:
-            fail("expose_host_permission: invalid legacy reporter arguments")
-        reporter, v2_perm, host_perm = v2_perm, host_perm, legacy_reporter[0]
     reporter = resolve_reporter(reporter)
     call_ksl_extension(reporter, "expose_host_permission", "hbi", v2_perm=v2_perm, host_perm=host_perm)
     return _make_host_permission_reference(host_perm)

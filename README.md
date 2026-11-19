@@ -184,7 +184,7 @@ host = resource(common=common,
     })
 ```
 
-The predeclared `reporter(name)` builtin sets the default for the current file. Call it once before resources or extension wrappers. Each imported file has its own default; defaults are not inherited through `load()`. Pass `reporter="other"` on a resource or wrapper call to override it. Without a default, an explicit reporter is required. Existing `resource("hbi", ...)` calls and fully positional reporter-first extension calls remain supported.
+The predeclared `reporter(name)` builtin sets the default for the current file. Call it once before resources or extension wrappers. Each imported file has its own default; defaults are not inherited through `load()`. Pass `reporter="other"` on a resource or wrapper call to override it. Without a default, an explicit reporter is required.
 
 Resources can reference other resources (relations) and define permission expressions using the logic operators (`intersect`, `union`, `exclude`) and helpers (`any`, `all`). [schema/API.md](schema/API.md) documents every symbol the DSL exposes — worth keeping open, since Starlark requires each one to be named in a `load()` and the editor extensions offer no autocomplete. See existing schemas under `schema/` for patterns.
 

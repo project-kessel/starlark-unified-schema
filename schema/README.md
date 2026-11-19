@@ -6,7 +6,7 @@ Starlark schema files go here.
 
 To invoke a KSL extension hand-authored downstream, use the `call_ksl_extension` builtin — no `load()` required. Wrap it in a function named for the extension rather than calling it directly from schema files; see [Backward-compatibility with KSL extensions](../ARCHITECTURE.md#backward-compatibility-with-ksl-extensions).
 
-Those wrappers live in [extensions/](extensions), one file per KSL namespace that defines extensions (`rbac.star`, `hbi.star`). Calls to them are grouped one file per app at the top level (`advisor.star`, `patch.star`, …), mirroring the hand-authored `.ksl` files still in `rbac-config`. Set the default once per file with `reporter("advisor")`, then omit the reporter from wrapper calls. The references land in that reporter's namespace (`advisor.json` in this example). An explicit `reporter="patch"` keyword overrides the default for one call. Defaults are scoped to the file being evaluated and do not propagate through `load()`. The former fully positional reporter-first calls remain supported.
+Those wrappers live in [extensions/](extensions), one file per KSL namespace that defines extensions (`rbac.star`, `hbi.star`). Calls to them are grouped one file per app at the top level (`advisor.star`, `patch.star`, …), mirroring the hand-authored `.ksl` files still in `rbac-config`. Set the default once per file with `reporter("advisor")`, then omit the reporter from wrapper calls. The references land in that reporter's namespace (`advisor.json` in this example). An explicit `reporter="patch"` keyword overrides the default for one call. Defaults are scoped to the file being evaluated and do not propagate through `load()`.
 
 ```python
 load("extensions/rbac.star", "add_v1_based_permission")

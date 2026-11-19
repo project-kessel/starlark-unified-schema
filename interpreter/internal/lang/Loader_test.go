@@ -204,8 +204,6 @@ func TestReporterWrapperErrors(t *testing.T) {
 		{`add_v1only_permission("view")`, "no default reporter"},
 		{`reporter("test"); add_v1only_permission("view", reporter="")`, "non-empty string"},
 		{`reporter("test"); add_v1only_permission("view", reporter=1)`, "non-empty string"},
-		{`add_v1only_permission("test", "view", "extra")`, "invalid legacy reporter arguments"},
-		{`add_v1only_permission("test", "view", reporter="other")`, "invalid legacy reporter arguments"},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
 			loader, reader, thread := createDefaultLoaderReaderAndThread()
