@@ -15,6 +15,8 @@ load("kessel.star", "resource", "field", "uuid")
 - [Builtins](#builtins)
   - [`call_ksl_extension`](#builtin-call-ksl-extension)
   - [`println`](#builtin-println)
+  - [`reporter`](#builtin-reporter)
+  - [`resolve_reporter`](#builtin-resolve-reporter)
   - [`struct`](#builtin-struct)
 - [`extensions/hbi.star`](#module-extensions-hbi-star)
   - [`expose_host_permission`](#extensions-hbi-star-expose-host-permission)
@@ -74,6 +76,26 @@ println(*values)
 
 Prints its arguments to stdout, for debugging a schema while it compiles. Not part of the schema itself — output goes to the terminal, never to a generated artifact.
 
+<a id="builtin-reporter"></a>
+
+### `reporter`
+
+```python
+reporter(name)
+```
+
+Sets the default reporter for the file currently being evaluated. Call once, before declaring resources or invoking extension wrappers. The name must be a non-empty string. Defaults do not propagate through load() imports. Pass reporter= explicitly on a call to override this default.
+
+<a id="builtin-resolve-reporter"></a>
+
+### `resolve_reporter`
+
+```python
+resolve_reporter(value=None)
+```
+
+Resolves an explicit reporter string or, for None, the default set by reporter(name) in the file currently being evaluated. Fails if no default is declared or the explicit value is not a non-empty string. Used by resource() and extension wrappers; custom wrappers can use it too.
+
 <a id="builtin-struct"></a>
 
 ### `struct`
@@ -95,14 +117,14 @@ Wrappers for KSL extensions in the `hbi` namespace: https://github.com/project-k
 ### `expose_host_permission`
 
 ```python
-expose_host_permission(reporter, v2_perm, host_perm)
+expose_host_permission(v2_perm, host_perm, *, reporter=None)
 ```
 
 Exposes an RBAC workspace permission transitively through the host.
 
 **Args:**
 
-- `reporter`: the reporter requesting the permission.
+- `reporter`: optional override for the file's `reporter(name)` default.
 - `v2_perm`: the RBAC permission being exposed.
 - `host_perm`: the name it is exposed as on the host type, used with access requests against hosts
 
@@ -121,14 +143,14 @@ Wrappers for KSL extensions in the `rbac` namespace: https://github.com/project-
 ### `add_v1_based_permission`
 
 ```python
-add_v1_based_permission(reporter, app, resource, verb, v2_perm)
+add_v1_based_permission(app, resource, verb, v2_perm, *, reporter=None)
 ```
 
 Declares a v2 permission derived from an existing RBAC v1 permission.
 
 **Args:**
 
-- `reporter`: the reporter requesting the permission.
+- `reporter`: optional override for the file's `reporter(name)` default.
 - `app`: RBAC v1 application name, taken from the permissions json filename without the .json extension e.g. `"inventory"`.
 - `resource`: RBAC v1 resource type, ex: `"hosts"`.
 - `verb`: RBAC v1 verb, ex: `"read"`, `"write"`.
@@ -143,7 +165,7 @@ Declares a v2 permission derived from an existing RBAC v1 permission.
 ### `add_v1only_permission`
 
 ```python
-add_v1only_permission(reporter, perm)
+add_v1only_permission(perm, *, reporter=None)
 ```
 
 Declares a permission that exists in RBAC v1, used to create placeholders for permissions for unmigrated services.
@@ -152,7 +174,7 @@ Returns nothing
 
 **Args:**
 
-- `reporter`: the reporter requesting the permission
+- `reporter`: optional override for the file's `reporter(name)` default.
 - `perm`: the v1 permission name, constructed from the RBAC application, resource, and verb: {application}_{resource}_{verb}
 
 <a id="extensions-rbac-star-add-contingent-permission"></a>
@@ -160,14 +182,14 @@ Returns nothing
 ### `add_contingent_permission`
 
 ```python
-add_contingent_permission(reporter, first, second, contingent)
+add_contingent_permission(first, second, contingent, *, reporter=None)
 ```
 
 Declares a workspace permission that depends on two other workspace permissions, commonly used when a permission may be granted anywhere but only applies where it overlaps with another
 
 **Args:**
 
-- `reporter`: the reporter requesting the permission
+- `reporter`: optional override for the file's `reporter(name)` default.
 - `first`: v2 name of the first prerequisite permission
 - `second`: v2 name of the second prerequisite permission.
 - `contingent`: name of the permission that applies where they overlap, used with access requests against workspaces
@@ -181,7 +203,7 @@ Declares a workspace permission that depends on two other workspace permissions,
 ### `add_unified_permission`
 
 ```python
-add_unified_permission(reporter, app, resource, verb)
+add_unified_permission(app, resource, verb, *, reporter=None)
 ```
 
 Declares a permission whose v1 and v2 names are the same.
@@ -190,7 +212,7 @@ The v1 and v2 permission names take the form `{app}_{resource}_{verb}`, and this
 
 **Args:**
 
-- `reporter`: reporter whose namespace the extension reference is written to.
+- `reporter`: optional override for the file's `reporter(name)` default.
 - `app`: RBAC application name.
 - `resource`: RBAC resource type.
 - `verb`: RBAC verb.
@@ -210,7 +232,7 @@ The Kessel schema DSL standard library.
 ### `resource`
 
 ```python
-resource(reporter, id_type=None, extends=None, final=False, common={}, fields={}, permissions={})
+resource(reporter=None, id_type=None, extends=None, final=False, common={}, fields={}, permissions={})
 ```
 
 Declares a resource type.
@@ -223,7 +245,7 @@ and use set operations to express more complex authorization logic (see Permissi
 
 **Args:**
 
-- `reporter`: name of the reporter that reports this resource, e.g. `"hbi"`.
+- `reporter`: name of the reporter that reports this resource, e.g. `"hbi"`. Defaults to the file's `reporter(name)` declaration. An explicit value overrides it.
 - `id_type`: data type of the resource's identifier. Must be a value data type (not another resource type.) Required unless `extends` is given, in which case the parent's id type is inherited and passing one here is an error.
 - `extends`: another resource whose common members, fields, and permissions this resource inherits. An extending resource has no independent identity and must always be associated with an instance of the parent type (reported with the same id.)  Only one level of inheritance is supported, so an extending resource is implicitly final.
 - `final`: if true, prevents other resource types from extending this one. This is recommended for types that aren't likely to be part of another service's domain or have no stable identity. Forced to True when `extends` is given.
@@ -251,7 +273,8 @@ that can be chained again:
 respectively.
 
 ```python
-workspace = resource("features", extends=rbac_workspace, fields={
+reporter("features")
+workspace = resource(extends=rbac_workspace, fields={
     "direct_billing_account": at_most_one(billing_account),
     "ignore_inherited_paid_services": boolean(service),
 }, permissions={

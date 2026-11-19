@@ -161,7 +161,7 @@ call_ksl_extension("advisor", "add_v1_based_permission", "rbac", app=inventory, 
 
 The first argument is the reporter whose namespace the reference is written to, the second names the extension, the third the namespace the extension is *defined* in, and every keyword argument becomes an extension parameter. All three positional arguments are required, and parameter values must be strings.
 
-It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly; those wrappers take the reporter as their own first argument and pass it through.
+It is a predeclared builtin, so no `load()` is needed. Schema authors are expected to call thin per-extension wrapper functions rather than this directly; those wrappers resolve their optional `reporter=` keyword against the calling file's default, then pass the resolved string through.
 
 References are grouped into the namespace named by `reporter`, alongside any types that reporter defines, and a reporter that only makes extension calls gets a namespace holding nothing but `extension_references`. Placement does not affect what an extension generates — `Extension.Apply` resolves each of its dynamic types against the extension's own namespace, never the calling one. Within a namespace, identical `(namespace, name, params)` calls are deduplicated, because applying an extension twice re-adds its relations to the type it extends; the same call under two different reporters is emitted in both.
 
@@ -310,7 +310,7 @@ The DSL lives in `schema/kessel.star` and is plain Starlark — the only custom 
 
 | Construct | Role |
 |-----------|------|
-| `resource(reporter, id_type, common={}, fields={}, permissions={})` | Defines a resource; returns a tagged struct consumed by the processor |
+| `resource(reporter=None, id_type=None, common={}, fields={}, permissions={})` | Defines a resource; returns a tagged struct consumed by the processor |
 | `field(type=..., required=..., description=...)` | Data field member |
 | `text`, `uuid`, `numeric_id`, `boolean()`, `date_time`, `enum`, `nullable`, `union`, `array`, `object` | Data type constructors; `boolean(target)` also creates a boolean-backed wildcard relation |
 | `at_most_one`, `one`, `at_least_one`, `many`, `wildcard` | Relation cardinality helpers; `wildcard(target)` keeps the qualified marker input, while `boolean(target)` creates an optional JSON boolean wildcard |
@@ -325,7 +325,9 @@ A minimal resource:
 load("kessel.star", "resource", "field", "uuid", "text", "nullable")
 load("host/common_representation.star", common="host")
 
-host = resource("hbi", common=common,
+reporter("hbi")
+
+host = resource(common=common,
     id_type=uuid(),
     fields={
         "ansible_host": field(type=nullable(text(maxLength=255))),
@@ -337,7 +339,7 @@ host = resource("hbi", common=common,
 Each resource type typically splits definition across two layers:
 
 1. **`common_representation.star`** — Shared fields and relations imported by multiple reporters via `load(..., common="host")`. This is a plain dict, not a `resource()` call.
-2. **`reporters/<reporter>/<type>.star`** — A `resource(reporter=..., ...)` binding that ties the type to a Kessel reporter namespace.
+2. **`reporters/<reporter>/<type>.star`** — A `reporter(name)` declaration and `resource(...)` binding that tie the type to a Kessel reporter namespace. An explicit `resource(reporter=..., ...)` overrides the default.
 
 The processor merges common and reporter members when visiting a resource. JSON Schema emits them as separate files (`common_representation.json` plus per-reporter schemas).
 
@@ -475,7 +477,9 @@ func (l *Loader) BuiltinDocs() []BuiltinDoc
 - Records `reporter`, type name, and `id_type` for each resource on load
 - `LoadBindsGlobally` stays off, so `load()`ed names bind file-locally rather than becoming globals of the importing module — the API reference generator depends on this to tell what a module defines from what it imports
 
-**Builtins** (`Builtins.go`): `struct` (from starlarkstruct), `println` (debug), `call_ksl_extension` (see [Backward-compatibility with KSL extensions](#backward-compatibility-with-ksl-extensions))
+**Reporter defaults**: `reporter(name)` records one non-empty default per module during evaluation. `Loader.currentModule` is saved and restored around recursive `load()` calls, so imported modules have independent defaults and wrapper functions use the module currently being evaluated. `resource()` and extension wrappers call `resolve_reporter(value)`; explicit strings win, while `None` uses that module's default or fails if none was declared. Repeated declarations are errors. No directory or filename inference is performed, and the processor and public visitor interfaces are unchanged.
+
+**Builtins** (`Builtins.go`): `reporter` and `resolve_reporter` (file-scoped reporter defaults), `struct` (from starlarkstruct), `println` (debug), `call_ksl_extension` (see [Backward-compatibility with KSL extensions](#backward-compatibility-with-ksl-extensions))
 
 `RegisterBuiltin` takes a signature and doc string alongside the callback, and both are mandatory. A `*starlark.Builtin` exposes only its name at runtime — there is no parameter metadata and no `Doc()` — so neither can be recovered by introspection the way a Starlark `def` can. They feed `schema/API.md`.
 

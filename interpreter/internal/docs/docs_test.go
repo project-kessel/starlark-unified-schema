@@ -196,5 +196,5 @@ func TestGenerateDocumentsBuiltins(t *testing.T) {
 		names = append(names, builtin.Name)
 	}
 
-	assert.Equal(t, []string{"call_ksl_extension", "println", "struct"}, names)
+	assert.Equal(t, []string{"call_ksl_extension", "println", "reporter", "resolve_reporter", "struct"}, names)
 }

@@ -175,12 +175,16 @@ Schemas live under `schema/` and use the DSL defined in `schema/kessel.star`. A 
 load("kessel.star", "resource", "field", "uuid", "text", "nullable")
 load("host/common_representation.star", common="host")
 
-host = resource("hbi", common=common,
+reporter("hbi")
+
+host = resource(common=common,
     id_type=uuid(),
     fields={
         "ansible_host": field(type=nullable(text(maxLength=255))),
     })
 ```
+
+The predeclared `reporter(name)` builtin sets the default for the current file. Call it once before resources or extension wrappers. Each imported file has its own default; defaults are not inherited through `load()`. Pass `reporter="other"` on a resource or wrapper call to override it. Without a default, an explicit reporter is required.
 
 Resources can reference other resources (relations) and define permission expressions using the logic operators (`intersect`, `union`, `exclude`) and helpers (`any`, `all`). [schema/API.md](schema/API.md) documents every symbol the DSL exposes — worth keeping open, since Starlark requires each one to be named in a `load()` and the editor extensions offer no autocomplete. See existing schemas under `schema/` for patterns.
 

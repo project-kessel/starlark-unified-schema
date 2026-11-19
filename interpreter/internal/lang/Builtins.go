@@ -8,6 +8,48 @@ import (
 )
 
 func registerDefaultBuiltins(l *Loader) {
+	l.RegisterBuiltin("reporter", "reporter(name)",
+		"Sets the default reporter for the file currently being evaluated. Call once, "+
+			"before declaring resources or invoking extension wrappers. The name must be a "+
+			"non-empty string. Defaults do not propagate through load() imports. "+
+			"Pass reporter= explicitly on a call to override this default.",
+		func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			var name string
+			if err := starlark.UnpackArgs("reporter", args, kwargs, "name", &name); err != nil {
+				return nil, err
+			}
+			if name == "" {
+				return nil, fmt.Errorf("reporter: name must not be empty")
+			}
+			if _, exists := l.reporters[l.currentModule]; exists {
+				return nil, fmt.Errorf("reporter: default already declared for %s", l.currentModule)
+			}
+			l.reporters[l.currentModule] = name
+			return starlark.None, nil
+		})
+
+	l.RegisterBuiltin("resolve_reporter", "resolve_reporter(value=None)",
+		"Resolves an explicit reporter string or, for None, the default set by "+
+			"reporter(name) in the file currently being evaluated. Fails if no default "+
+			"is declared or the explicit value is not a non-empty string. Used by "+
+			"resource() and extension wrappers; custom wrappers can use it too.",
+		func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			value := starlark.Value(starlark.None)
+			if err := starlark.UnpackArgs("resolve_reporter", args, kwargs, "value?", &value); err != nil {
+				return nil, err
+			}
+			if value == starlark.None {
+				if name, ok := l.reporters[l.currentModule]; ok {
+					return starlark.String(name), nil
+				}
+				return nil, fmt.Errorf("resolve_reporter: no default reporter for %s; call reporter(name) first or pass reporter explicitly", l.currentModule)
+			}
+			if name, ok := starlark.AsString(value); ok && name != "" {
+				return value, nil
+			}
+			return nil, fmt.Errorf("resolve_reporter: reporter must be a non-empty string")
+		})
+
 	l.RegisterBuiltin("struct", "struct(**fields)",
 		"Creates an immutable struct from the given keyword arguments. Fields are "+
 			"read back with attribute access (`s.name`), and the set of field names "+

@@ -16,12 +16,12 @@ Tests use the standard library `testing` package and `github.com/stretchr/testif
 | Package | File | Focus |
 |---------|------|-------|
 | `internal/lang` | `Processor_test.go` | Semantic walk: fields, relations, permissions |
-| `internal/lang` | `Loader_test.go` | Module discovery, `load()` order, caching |
+| `internal/lang` | `Loader_test.go` | Module discovery, `load()` order, caching, reporter defaults and validation |
 | `internal/output` | `jsonschema_test.go` | JSONSchemaVisitor unit tests, per data type |
 | `internal/output` | `ksil_test.go` | KSILVisitor unit tests, per relation/permission shape |
 | `internal/docs` | `docs_test.go`, `signature_test.go`, `docstring_test.go` | API reference generation; `TestAPIReferenceIsUpToDate` guards committed `schema/API.md` |
 | `internal/util` | `spy_visitor_test.go` | SpyVisitor capture format |
-| `cmd/interpreter` | `e2e_test.go` | Full pipeline: `.star` fixtures → JSON Schema and KSIL |
+| `cmd/interpreter` | `e2e_test.go` | Full pipeline: `.star` fixtures → JSON Schema and KSIL; equivalence of default and explicit reporter calls |
 
 For pipeline and visitor design context, see [ARCHITECTURE.md](../ARCHITECTURE.md#testing-strategy).
 
