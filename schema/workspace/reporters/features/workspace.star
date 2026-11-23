@@ -2,6 +2,10 @@ load("kessel.star", "resource", "at_most_one", "many", "boolean", "any", "uuid")
 load("billing_account/reporters/features/billing_account.star", "billing_account")
 load("service/reporters/features/service.star", "service")
 load("workspace/reporters/rbac/workspace.star", rbac_workspace="workspace")
+load("extensions/rbac.star", "add_v1_based_permission")
+
+add_v1_based_permission("subscriptions", "subscriptions", "workspaces", "read", "subscriptions_workspaces_view")
+add_v1_based_permission("subscriptions", "subscriptions", "workspaces", "write", "subscriptions_workspaces_edit")
 
 reporter("features")
 
